@@ -5,7 +5,7 @@ from claude_agent_sdk import query, ClaudeAgentOptions
 async def main():
     async for message in query(
         prompt="What files are in this directory?",
-        options=ClaudeAgentOptions(allowed_tools=["Bash", "Glob"]),
+        options=ClaudeAgentOptions(allowed_tools=["Bash", "Glob"], model="claude-haiku-4-5"),
     ):
         if hasattr(message, "result"):
             print(message.result)

@@ -13,10 +13,11 @@ class GraphState(TypedDict):
   review_notes: str
 
 def extract_field(text: str, label: str) -> str:
-    """Szuka linii 'LABEL: wartość' w tekście i zwraca 'wartość'."""
+    """Szuka linii 'LABEL: wartość' (ignorując np. markdown '## ' czy '**') i zwraca 'wartość'."""
     for line in text.splitlines():
-        if line.strip().upper().startswith(label.upper() + ":"):
-            return line.split(":", 1)[1].strip()
+        cleaned = line.strip().lstrip("#").lstrip("*").strip()
+        if cleaned.upper().startswith(label.upper() + ":"):
+            return cleaned.split(":", 1)[1].strip()
     return ""
 
 async def run_writer(state: GraphState) -> GraphState:

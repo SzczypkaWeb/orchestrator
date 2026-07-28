@@ -2,6 +2,7 @@ from typing import Literal
 from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage
 from state import GraphState
 from schemas import CLASSIFY_SCHEMA, WRITER_SCHEMA, REVIEW_SCHEMA
+from retry import with_retry, TransientError, TRANSIENT_STATUS_CODES
 
 async def classify_task(state: GraphState) -> GraphState:
     prompt = f"""
@@ -55,27 +56,42 @@ Do the following steps in order:
 When you are finished, clearly state in your final answer: the exact name of
 the branch you created, and the full URL of the pull request you opened.
 """
-    branch, pr_url = "", ""
-    async for message in query(
-        prompt=prompt,
-        options=ClaudeAgentOptions(
-            cwd=state["repo_path"],
-            allowed_tools=["Read", "Edit", "Write", "Bash", "Glob", "Grep", "Skill"],
-            model=state["writer_model"],
-            output_format={"type": "json_schema", "schema": WRITER_SCHEMA},
-            setting_sources=["user", "project"],
-            skills="all",
-        ),
-    ):
-        if isinstance(message, ResultMessage):
-            if message.is_error:
-                raise RuntimeError(f"Agent run failed ({message.api_error_status}): {message.result}")
-            if message.subtype == "success" and message.structured_output:
-                branch = message.structured_output["branch"]
-                pr_url = message.structured_output["pr_url"]
-            else:
-                  raise RuntimeError(f"Writer agent did not return valid structured output: {message.subtype}")
 
+    async def attempt():
+        branch, pr_url = "", ""
+        async for message in query(
+            prompt=prompt,
+            options=ClaudeAgentOptions(
+                cwd=state["repo_path"],
+                allowed_tools=["Read", "Edit", "Write", "Bash", "Glob", "Grep", "Skill"],
+                model=state["writer_model"],
+                output_format={"type": "json_schema", "schema": WRITER_SCHEMA},
+                setting_sources=["user", "project"],
+                skills="all",
+            ),
+        ):
+            if isinstance(message, ResultMessage):
+                # print("=== DEBUG RESULT MESSAGE ===")
+                # print(f"subtype={message.subtype!r}")
+                # print(f"is_error={message.is_error!r}")
+                # print(f"structured_output={message.structured_output!r}")
+                # print(f"num_turns={getattr(message, 'num_turns', None)!r}")
+                # print(f"result={getattr(message, 'result', None)!r}")
+                # print("=== /DEBUG ===")
+                if message.is_error:
+                    if message.api_error_status in TRANSIENT_STATUS_CODES:
+                        raise TransientError(f"{message.api_error_status}: {message.result}")
+                    raise RuntimeError(f"Agent run failed ({message.api_error_status}): {message.result}")
+                if message.subtype == "success" and message.structured_output:
+                    branch = message.structured_output["branch"]
+                    pr_url = message.structured_output["pr_url"]
+                elif message.subtype == "success":
+                    raise TransientError("Writer agent completed without calling structured output")
+                else:
+                    raise RuntimeError(f"Writer agent did not return valid structured output: {message.subtype}")
+        return branch, pr_url
+
+    branch, pr_url = await with_retry(attempt)
     return {**state, "branch": branch, "pr_url": pr_url}
 
 
@@ -91,25 +107,33 @@ significant issues, or "changes_requested" if you find problems that
 must be fixed before merging. Write your review notes in English,
 explaining the reasoning behind your verdict.
 """
-    verdict, notes = "", ""
-    async for message in query(
-        prompt=prompt,
-        options=ClaudeAgentOptions(
-            cwd=state["repo_path"],
-            allowed_tools=["Read", "Bash", "Glob", "Grep"],
-            model="claude-haiku-4-5",
-            output_format={"type": "json_schema", "schema": REVIEW_SCHEMA},
-        ),
-    ):
-        if isinstance(message, ResultMessage):
-            if message.is_error:
-                raise RuntimeError(f"Agent run failed ({message.api_error_status}): {message.result}")
-            if message.subtype == "success" and message.structured_output:
-                verdict = message.structured_output["verdict"]
-                notes = message.structured_output["notes"]
-            else:
-                raise RuntimeError(f"Security review agent did not return valid structured output: {message.subtype}")
 
+    async def attempt():
+        verdict, notes = "", ""
+        async for message in query(
+            prompt=prompt,
+            options=ClaudeAgentOptions(
+                cwd=state["repo_path"],
+                allowed_tools=["Read", "Bash", "Glob", "Grep"],
+                model="claude-haiku-4-5",
+                output_format={"type": "json_schema", "schema": REVIEW_SCHEMA},
+            ),
+        ):
+            if isinstance(message, ResultMessage):
+                if message.is_error:
+                    if message.api_error_status in TRANSIENT_STATUS_CODES:
+                        raise TransientError(f"{message.api_error_status}: {message.result}")
+                    raise RuntimeError(f"Agent run failed ({message.api_error_status}): {message.result}")
+                if message.subtype == "success" and message.structured_output:
+                    verdict = message.structured_output["verdict"]
+                    notes = message.structured_output["notes"]
+                elif message.subtype == "success":
+                    raise TransientError("Security review agent completed without calling structured output")
+                else:
+                    raise RuntimeError(f"Security review agent did not return valid structured output: {message.subtype}")
+        return verdict, notes
+
+    verdict, notes = await with_retry(attempt)
     return {**state, "review_verdict": verdict, "review_notes": notes}
 
 

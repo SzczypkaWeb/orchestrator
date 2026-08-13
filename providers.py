@@ -1,0 +1,47 @@
+import json
+import os
+from groq import Groq
+from google import genai
+
+# Mirrors ai-service/providers.py's pattern (same two providers, same idea:
+# cheap/fast structured JSON completion, no agentic tool use). Kept as a
+# separate copy rather than importing across repos - each Python service
+# here is independently deployable with its own venv/deps, same as every
+# other repo in this project.
+#
+# Explicit `os.environ[...]` (not relying on the SDKs' own default env var
+# names) on purpose: ai-service's .env has GROG_API_KEY/DEFAULT_GEMINI_API_KEY,
+# neither of which matches what the groq/google-genai SDKs read by default
+# (GROQ_API_KEY / GOOGLE_API_KEY or GEMINI_API_KEY) - meaning those calls may
+# have been silently authenticating as anonymous/failing and falling back
+# every time, without ever raising a visible error. Reading an explicit,
+# correctly-named var here means a missing/wrong key fails loudly (KeyError)
+# instead of silently degrading to the next fallback.
+
+
+def complete_with_groq(prompt: str, schema: dict, model: str = "openai/gpt-oss-20b") -> dict:
+    """Structured JSON completion via Groq. Raises on any failure - callers
+    are expected to catch and fall back (see classify_task/run_security_review
+    in nodes.py)."""
+    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {"name": "response", "strict": True, "schema": schema},
+        },
+    )
+    return json.loads(response.choices[0].message.content or "{}")
+
+
+def complete_with_gemini(prompt: str, schema: dict, model: str = "gemini-3.5-flash") -> dict:
+    """Structured JSON completion via Gemini. Raises on any failure - see
+    complete_with_groq."""
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt,
+        config={"response_format": {"text": {"mime_type": "application/json", "schema": schema}}},
+    )
+    return json.loads(response.text)

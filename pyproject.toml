@@ -9,4 +9,8 @@ dependencies = [
     "langgraph>=1.2.9",
     "groq>=0.11.0",
     "google-genai>=0.3.0",
+    # Telemetry writes straight to backend's Postgres (see telemetry.py) -
+    # there's no Prisma/Node runtime here, so this is the orchestrator's only
+    # DB dependency, deliberately a plain driver rather than an ORM.
+    "asyncpg>=0.30.0",
 ]

@@ -6,6 +6,7 @@ from state import GraphState
 from schemas import CLASSIFY_SCHEMA, WRITER_SCHEMA, REVIEW_SCHEMA
 from retry import with_retry, TransientError, TRANSIENT_STATUS_CODES
 from providers import complete_with_groq, complete_with_gemini
+from telemetry import record_metric, Timer
 
 # Reviewer is deliberately a different model family than the writer (Claude) -
 # a second Claude call reviewing Claude's own output shares the same blind
@@ -41,24 +42,46 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
     # the actual code.
     for provider_name, complete in (("groq", complete_with_groq), ("gemini", complete_with_gemini)):
         try:
-            result = await asyncio.to_thread(complete, prompt, CLASSIFY_SCHEMA)
+            with Timer() as t:
+                result, usage = await asyncio.to_thread(complete, prompt, CLASSIFY_SCHEMA)
             complexity = result["complexity"]
+            await record_metric(
+                run_id=state["run_id"], repo=state["repo"], node="classify_task",
+                provider=provider_name, model="default", duration_ms=t.duration_ms,
+                success=True, input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"),
+            )
             break
         except Exception as e:
             print(f"[classify_task] {provider_name} failed ({e}), trying next provider...")
+            await record_metric(
+                run_id=state["run_id"], repo=state["repo"], node="classify_task",
+                provider=provider_name, model="default", duration_ms=0,
+                success=False, error_message=str(e),
+            )
 
     if complexity is None:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                allowed_tools=[],
-                model="claude-haiku-4-5",
-                output_format={"type": "json_schema", "schema": CLASSIFY_SCHEMA},
-            ),
-        ):
-            if isinstance(message, ResultMessage):
-                if not message.is_error and message.subtype == "success" and message.structured_output:
-                    complexity = message.structured_output["complexity"]
+        haiku_model = "claude-haiku-4-5"
+        with Timer() as t:
+            async for message in query(
+                prompt=prompt,
+                options=ClaudeAgentOptions(
+                    allowed_tools=[],
+                    model=haiku_model,
+                    output_format={"type": "json_schema", "schema": CLASSIFY_SCHEMA},
+                ),
+            ):
+                if isinstance(message, ResultMessage):
+                    if not message.is_error and message.subtype == "success" and message.structured_output:
+                        complexity = message.structured_output["complexity"]
+                    await record_metric(
+                        run_id=state["run_id"], repo=state["repo"], node="classify_task",
+                        provider="claude", model=haiku_model,
+                        duration_ms=message.duration_ms, success=not message.is_error,
+                        input_tokens=(message.usage or {}).get("input_tokens"),
+                        output_tokens=(message.usage or {}).get("output_tokens"),
+                        total_cost_usd=message.total_cost_usd,
+                        error_message=message.result if message.is_error else None,
+                    )
 
     model = "claude-haiku-4-5" if complexity == "simple_crud" else "claude-sonnet-5"
     return {**state, "writer_model": model}
@@ -162,6 +185,20 @@ the branch you created, and the full URL of the pull request you opened.
             ),
         ):
             if isinstance(message, ResultMessage):
+                # Recorded before any raise below, so a transient/permanent
+                # failure still leaves a telemetry row (with success=False) -
+                # writer runs are the most expensive calls this project makes,
+                # so a failed attempt's cost/duration matters at least as much
+                # as a successful one's.
+                await record_metric(
+                    run_id=state["run_id"], repo=state["repo"], node="writer",
+                    provider="claude", model=state["writer_model"],
+                    duration_ms=message.duration_ms, success=not message.is_error,
+                    input_tokens=(message.usage or {}).get("input_tokens"),
+                    output_tokens=(message.usage or {}).get("output_tokens"),
+                    total_cost_usd=message.total_cost_usd,
+                    error_message=message.result if message.is_error else None,
+                )
                 if message.is_error:
                     if message.api_error_status in TRANSIENT_STATUS_CODES:
                         raise TransientError(f"{message.api_error_status}: {message.result}")
@@ -215,7 +252,20 @@ async def _review_with_gemini(state: GraphState) -> tuple[str, str]:
     if not diff.strip():
         raise RuntimeError(f"Empty diff for branch {state['branch']} vs main - nothing to review")
 
-    result = await asyncio.to_thread(complete_with_gemini, _build_review_prompt(state, diff), REVIEW_SCHEMA)
+    try:
+        with Timer() as t:
+            result, usage = await asyncio.to_thread(complete_with_gemini, _build_review_prompt(state, diff), REVIEW_SCHEMA)
+    except Exception as e:
+        await record_metric(
+            run_id=state["run_id"], repo=state["repo"], node="security_review",
+            provider="gemini", model="default", duration_ms=0, success=False, error_message=str(e),
+        )
+        raise
+    await record_metric(
+        run_id=state["run_id"], repo=state["repo"], node="security_review",
+        provider="gemini", model="default", duration_ms=t.duration_ms, success=True,
+        input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"),
+    )
     return result["verdict"], result["notes"]
 
 
@@ -235,6 +285,8 @@ must be fixed before merging. Write your review notes in English,
 explaining the reasoning behind your verdict.
 """
 
+    fallback_model = "claude-haiku-4-5"
+
     async def attempt():
         verdict, notes = "", ""
         async for message in query(
@@ -242,13 +294,22 @@ explaining the reasoning behind your verdict.
             options=ClaudeAgentOptions(
                 cwd=state["repo_path"],
                 allowed_tools=["Read", "Bash", "Glob", "Grep", "Skill"],
-                model="claude-haiku-4-5",
+                model=fallback_model,
                 output_format={"type": "json_schema", "schema": REVIEW_SCHEMA},
                 setting_sources=["user", "project"],
                 skills="all",
             ),
         ):
             if isinstance(message, ResultMessage):
+                await record_metric(
+                    run_id=state["run_id"], repo=state["repo"], node="security_review",
+                    provider="claude", model=fallback_model,
+                    duration_ms=message.duration_ms, success=not message.is_error,
+                    input_tokens=(message.usage or {}).get("input_tokens"),
+                    output_tokens=(message.usage or {}).get("output_tokens"),
+                    total_cost_usd=message.total_cost_usd,
+                    error_message=message.result if message.is_error else None,
+                )
                 if message.is_error:
                     if message.api_error_status in TRANSIENT_STATUS_CODES:
                         raise TransientError(f"{message.api_error_status}: {message.result}")

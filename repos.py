@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path
 
 # All repo paths below are resolved relative to THIS FILE's location, not the
@@ -162,6 +163,13 @@ def initial_state_for(repo_name: str, task_text: str, existing_branch: str = "",
     cfg = REPOS[repo_name]
     return {
         "task": task_text,
+        "repo": repo_name,
+        # One id per invocation of this function, i.e. one per compiled.ainvoke()
+        # call - a single lead.py run produces several distinct run_ids (one
+        # per subtask), each of which can still fan out into multiple
+        # telemetry rows internally (classify + writer + review, plus any
+        # review-retry rows) - see telemetry.py.
+        "run_id": str(uuid.uuid4()),
         "repo_path": cfg["path"],
         "stack_description": cfg["stack_description"],
         "review_focus": cfg["review_focus"],

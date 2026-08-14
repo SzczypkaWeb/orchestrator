@@ -19,10 +19,15 @@ from google import genai
 # instead of silently degrading to the next fallback.
 
 
-def complete_with_groq(prompt: str, schema: dict, model: str = "openai/gpt-oss-20b") -> dict:
+def complete_with_groq(prompt: str, schema: dict, model: str = "openai/gpt-oss-20b") -> tuple[dict, dict]:
     """Structured JSON completion via Groq. Raises on any failure - callers
     are expected to catch and fall back (see classify_task/run_security_review
-    in nodes.py)."""
+    in nodes.py).
+
+    Returns (parsed_json, usage) rather than just the parsed dict - `usage`
+    carries token counts for telemetry.py (see nodes.py's call sites), kept
+    as a plain dict rather than baking a "_usage" key into the response body
+    itself, which would leak into the schema-validated JSON."""
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
     response = client.chat.completions.create(
         model=model,
@@ -32,11 +37,17 @@ def complete_with_groq(prompt: str, schema: dict, model: str = "openai/gpt-oss-2
             "json_schema": {"name": "response", "strict": True, "schema": schema},
         },
     )
-    return json.loads(response.choices[0].message.content or "{}")
+    data = json.loads(response.choices[0].message.content or "{}")
+    usage = {
+        "input_tokens": response.usage.prompt_tokens if response.usage else None,
+        "output_tokens": response.usage.completion_tokens if response.usage else None,
+    }
+    return data, usage
 
 
-def complete_with_gemini(prompt: str, schema: dict, model: str = "gemini-3.5-flash") -> dict:
+def complete_with_gemini(prompt: str, schema: dict, model: str = "gemini-3.5-flash") -> tuple[dict, dict]:
     """Structured JSON completion via Gemini. Raises on any failure - see
+    complete_with_groq. Returns (parsed_json, usage), same shape/reasoning as
     complete_with_groq."""
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     response = client.models.generate_content(
@@ -44,4 +55,9 @@ def complete_with_gemini(prompt: str, schema: dict, model: str = "gemini-3.5-fla
         contents=prompt,
         config={"response_format": {"text": {"mime_type": "application/json", "schema": schema}}},
     )
-    return json.loads(response.text)
+    data = json.loads(response.text)
+    usage = {
+        "input_tokens": getattr(response.usage_metadata, "prompt_token_count", None),
+        "output_tokens": getattr(response.usage_metadata, "candidates_token_count", None),
+    }
+    return data, usage

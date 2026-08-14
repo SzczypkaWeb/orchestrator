@@ -2,6 +2,14 @@ from typing import TypedDict
 
 class GraphState(TypedDict):
     task: str
+    # REPOS key this run targets (backend, frontend-shell, ...) - see
+    # repos.py. Kept separate from repo_path since telemetry rows want the
+    # short logical name, not a filesystem path.
+    repo: str
+    # Groups every telemetry row this run produces (classify + writer +
+    # review, possibly several review-retry rows) - see telemetry.py and
+    # repos.py's initial_state_for().
+    run_id: str
     repo_path: str
     stack_description: str
     review_focus: str

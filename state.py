@@ -25,3 +25,13 @@ class GraphState(TypedDict):
     # Not set by initial_state_for() - defaults to 0 via state.get(...) at
     # every read site, so existing callers don't need to change.
     review_attempts: int
+    # Deterministic gate run between writer and security_review - actually
+    # runs `pnpm lint`/`pnpm test` on the branch rather than trusting the
+    # writer's own tool calls succeeded (see run_verification in nodes.py).
+    # Separate counter/fields from review_* on purpose: a lint/test failure
+    # is a different kind of feedback than an LLM review verdict, and gets
+    # its own small retry budget so it can't eat into review's. Also not set
+    # by initial_state_for() - same state.get(..., default) pattern.
+    verify_passed: bool
+    verify_output: str
+    verify_attempts: int

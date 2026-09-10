@@ -33,13 +33,29 @@ Two nodes deliberately don't go straight to Claude:
 
 ## Self-healing retry loop
 
-`security_review` no longer only returns `"done"` or `"blocked"`. A
-`"changes_requested"` verdict now routes back to `writer` (via
-`route_after_review` in `nodes.py` / the conditional edge in `graph.py`), up
-to `MAX_REVIEW_ATTEMPTS` (2) times before giving up and reporting `blocked`.
-On a retry, `run_writer` checks out the same branch it already pushed and
-fixes exactly the review feedback — it does not start over or open a second
-PR. State tracked via `review_attempts` in `state.py`.
+Pipeline is `classify_task → writer → verify → security_review`. Two
+independent retry loops feed back into `writer`, each with its own attempt
+budget so one doesn't eat the other's:
+
+- `verify` (`run_verification` in `nodes.py`) actually runs `pnpm lint` then
+  `pnpm test` as real subprocesses on the branch the writer just pushed - not
+  an LLM judgment call, a real command exit code. `security_review` is never
+  invoked on a diff that doesn't pass its own lint/test suite; the review
+  call would be wasted money on rework `verify` already knows is needed. Up
+  to `MAX_VERIFY_ATTEMPTS` (2) retries, tracked via `verify_attempts`/
+  `verify_passed`/`verify_output` in `state.py`, before giving up and
+  reporting `blocked`. This does NOT substitute for a repo's own lint config
+  actually enabling the rules you want enforced - see BLOG_NOTES.md for a
+  case where `pnpm lint` genuinely could not have caught an issue because
+  the relevant rule was off.
+- `security_review` reviews the diff's substance (a judgment call an exit
+  code can't make) and no longer only returns `"done"` or `"blocked"`. A
+  `"changes_requested"` verdict routes back to `writer`, up to
+  `MAX_REVIEW_ATTEMPTS` (2) times, tracked via `review_attempts`.
+
+Either way, `run_writer` checks out the same branch it already pushed and
+fixes exactly the reported problem (verify's real output, or review's
+feedback) — it does not start over or open a second PR.
 
 ## Running it from inside a repo (no `cd` into `orchestrator/` needed)
 

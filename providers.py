@@ -45,7 +45,7 @@ def complete_with_groq(prompt: str, schema: dict, model: str = "openai/gpt-oss-2
     return data, usage
 
 
-def complete_with_gemini(prompt: str, schema: dict, model: str = "gemini-3.5-flash") -> tuple[dict, dict]:
+def complete_with_gemini(prompt: str, schema: dict, model: str = "gemini-3.8-flash") -> tuple[dict, dict]:
     """Structured JSON completion via Gemini. Raises on any failure - see
     complete_with_groq. Returns (parsed_json, usage), same shape/reasoning as
     complete_with_groq."""

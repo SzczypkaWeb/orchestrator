@@ -50,9 +50,12 @@ async def main():
     result = await compiled.ainvoke(
         initial_state_for(args.repo, task_text, existing_branch=args.branch or "", existing_pr_url=args.pr_url or "")
     )
-    print("Model wybrany przez klasyfikator:", result["writer_model"])
+    print("Model chosen by classifier:", result["writer_model"])
     print("Branch:", result["branch"])
     print("PR:", result["pr_url"])
+    print("Verify passed:", result.get("verify_passed"))
+    if not result.get("verify_passed", True):
+        print("Verify output:", result.get("verify_output"))
     print("Verdict:", result["review_verdict"])
     print("Notes:", result["review_notes"])
 

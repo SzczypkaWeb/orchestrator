@@ -85,5 +85,6 @@ async def run_lead(high_level_task: str) -> None:
         else:
             print(f"  Branch: {result['branch']}")
             print(f"  PR: {result['pr_url']}")
+            print(f"  Verify passed: {result.get('verify_passed')}")
             print(f"  Verdict: {result['review_verdict']}")
             print(f"  Notes: {result['review_notes']}")

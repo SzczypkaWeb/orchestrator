@@ -13,4 +13,6 @@ dependencies = [
     # there's no Prisma/Node runtime here, so this is the orchestrator's only
     # DB dependency, deliberately a plain driver rather than an ORM.
     "asyncpg>=0.30.0",
+    "fastapi>=0.141.1",
+    "uvicorn>=0.51.0",
 ]

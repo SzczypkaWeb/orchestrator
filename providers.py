@@ -53,7 +53,13 @@ def complete_with_gemini(prompt: str, schema: dict, model: str = "gemini-3.8-fla
     response = client.models.generate_content(
         model=model,
         contents=prompt,
-        config={"response_format": {"text": {"mime_type": "application/json", "schema": schema}}},
+        # `response_format` isn't a real field on the current SDK's
+        # GenerateContentConfig (this was silently never exercised before -
+        # GEMINI_API_KEY was unset in every prior run). `response_json_schema`
+        # is the correct field for a raw JSON Schema dict like ours (as
+        # opposed to `response_schema`, which expects a Pydantic/TypedDict
+        # class) - `response_mime_type` is required alongside it.
+        config={"response_mime_type": "application/json", "response_json_schema": schema},
     )
     data = json.loads(response.text)
     usage = {

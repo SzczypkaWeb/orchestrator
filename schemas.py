@@ -5,7 +5,13 @@ CLASSIFY_SCHEMA = {
     "properties": {
         "complexity": {"type": "string", "enum": ["simple_crud", "novel"]},
     },
-    "required": ["complexity"]
+    "required": ["complexity"],
+    # Groq's strict (OpenAI-compatible) structured output mode requires
+    # additionalProperties:false on every object in the schema, including
+    # the root - without it, Groq rejects the request outright (this only
+    # surfaced once GROQ_API_KEY was actually set; the path was silently
+    # skipped before that).
+    "additionalProperties": False,
 }
 
 WRITER_SCHEMA = {

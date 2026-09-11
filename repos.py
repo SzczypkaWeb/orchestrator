@@ -31,6 +31,7 @@ REPOS = {
         "path": str(_SIBLINGS_DIR / "backend"),
         "stack_description": "Nest.js + Prisma (PostgreSQL, hosted on Supabase). Deployed to GCP Cloud Run via Workload Identity Federation (keyless GitHub Actions auth, no static service-account keys). Run tests with `pnpm test`.",
         "review_focus": "secrets in code, missing input validation, SQL injection, overly permissive CORS, missing tests for new logic. lint errors or eslint-disable comments suppressing type-safety rules without justification",
+        "target_branch": "staging",
     },
     "frontend-shell": {
         "path": str(_SIBLINGS_DIR / "frontend-shell"),
@@ -51,6 +52,7 @@ REPOS = {
             "with react-app's (react/react-dom must stay singleton), changes to what this "
             "app exposes/serves at the root without a matching staticwebapp.config.json update"
         ),
+        "target_branch": "staging",
     },
     "react-app": {
         "path": str(_SIBLINGS_DIR / "react-app"),
@@ -73,6 +75,7 @@ REPOS = {
             "static entry points (remoteEntry.js-like files, new chunks) missing a matching "
             "CORS route in staticwebapp.config.json"
         ),
+        "target_branch": "staging",
     },
     "shared-ui": {
         "path": str(_SIBLINGS_DIR / "shared-ui"),
@@ -100,6 +103,7 @@ REPOS = {
             "unstyled), changes to globals.css or postcss-preset.cjs without checking whether "
             "the package.json `exports`/`files` fields still cover them"
         ),
+        "target_branch": "main",
     },
     "next-app": {
         "path": str(_SIBLINGS_DIR / "next-app"),
@@ -116,6 +120,7 @@ REPOS = {
             "of importing from @szczypkaweb/shared-ui, SEO regressions (missing/incorrect "
             "metadata) given this app's entire purpose is marketing/SEO"
         ),
+        "target_branch": "main",
     },
     "e2e-tests": {
         "path": str(_SIBLINGS_DIR / "e2e-tests"),
@@ -140,6 +145,7 @@ REPOS = {
             "Supabase-backed E2E_DATABASE_URL, missing global-teardown cleanup for anything "
             "seeded in global-setup"
         ),
+        "target_branch": "main",
     },
 }
 
@@ -173,6 +179,7 @@ def initial_state_for(repo_name: str, task_text: str, existing_branch: str = "",
         "repo_path": cfg["path"],
         "stack_description": cfg["stack_description"],
         "review_focus": cfg["review_focus"],
+        "target_branch": cfg["target_branch"],
         "writer_model": "",
         "branch": "", "pr_url": "", "review_verdict": "", "review_notes": "",
         "existing_branch": existing_branch,

@@ -13,6 +13,14 @@ class GraphState(TypedDict):
     repo_path: str
     stack_description: str
     review_focus: str
+    # Base branch the writer opens its PR against and the reviewer diffs
+    # against - "staging" for repos with a staging deploy environment
+    # (backend, frontend-shell, react-app all deploy on push to `staging`
+    # before anything reaches `main` - see repos.py/RUNBOOK.md), "main"
+    # everywhere else. Set by repos.py's initial_state_for() - never
+    # hardcode "main" directly in a prompt or a `git diff`/`gh pr create`
+    # call, or it silently targets the wrong branch for these three repos.
+    target_branch: str
     writer_model: str
     branch: str
     pr_url: str

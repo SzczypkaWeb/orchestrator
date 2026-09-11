@@ -87,6 +87,39 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
     return {**state, "writer_model": model}
 
 
+def _target_branch_is_stale(repo_path: str, target_branch: str) -> str | None:
+    """Returns a human-readable warning if `target_branch` (e.g. `staging`)
+    is missing commits that exist on `main` - e.g. a hotfix landed directly
+    on `main` and was never merged back down - or None if they're in sync
+    (or target_branch IS main, nothing to compare). A real git history
+    check, not an LLM's opinion - same reasoning as run_verification: no
+    amount of careful prompting substitutes for actually checking.
+
+    Deliberately only checks main -> target_branch missing commits, not the
+    other direction - target_branch being AHEAD of main (unpromoted feature
+    work already merged there) is the normal, expected state, not staleness."""
+    if target_branch == "main":
+        return None
+    subprocess.run(
+        ["git", "-C", repo_path, "fetch", "origin", "main", target_branch],
+        capture_output=True,
+    )
+    result = subprocess.run(
+        ["git", "-C", repo_path, "log", f"origin/{target_branch}..origin/main", "--oneline"],
+        capture_output=True, text=True,
+    )
+    missing_commits = result.stdout.strip()
+    if not missing_commits:
+        return None
+    return (
+        f"'{target_branch}' is missing commits that are already on 'main' - it needs "
+        f"to be updated before new work branches off it, or this work would be based "
+        f"on a stale snapshot:\n{missing_commits}\n"
+        f"Fix: cd {repo_path} && git checkout {target_branch} && git pull && "
+        f"git merge main && git push origin {target_branch}"
+    )
+
+
 async def run_writer(state: GraphState) -> GraphState:
     # Four distinct situations, in priority order:
     #  1. Retrying after run_verification found `pnpm lint`/`pnpm test`
@@ -188,12 +221,28 @@ branch: {continue_branch}
 pr_url: {continue_pr_url}
 """
     else:
+        # Fresh start only: about to branch off target_branch, so make sure
+        # it's not missing commits main already has - check BEFORE spending
+        # any Claude tokens, not after. Not applicable to the three branches
+        # above (verify-retry/review-retry/continue) since those work on a
+        # branch that already exists, not one about to be cut from target_branch.
+        stale_warning = _target_branch_is_stale(state["repo_path"], state["target_branch"])
+        if stale_warning:
+            await record_metric(
+                run_id=state["run_id"], repo=state["repo"], node="writer",
+                provider="local", model="git", duration_ms=0, success=False,
+                error_message=stale_warning,
+            )
+            raise RuntimeError(f"Refusing to start new work on '{state['repo']}': {stale_warning}")
+
         prompt = f"""
 You are working in a repo with this stack: {state['stack_description']}
 Task: {state['task']}
 
 Do the following steps in order:
-1. git checkout main && git pull, then create a new branch with a sensible name (feat/<something>).
+1. git checkout {state['target_branch']} && git pull, then create a new branch with a
+   sensible name (feat/<something>) off of {state['target_branch']} - NOT off main,
+   unless target_branch is main.
 2. Write test(s) based directly on the task specification above, BEFORE writing any
    implementation. These tests describe the expected contract/behavior, independent
    of how you will implement it.
@@ -201,7 +250,8 @@ Do the following steps in order:
 4. Run the test suite, fix anything that fails (fix the implementation, not the
    test, unless a test was genuinely wrong given the spec).
 5. Commit your changes (conventional commits).
-6. Push the branch and open a PR: gh pr create --base main --head <branch> --fill
+6. Push the branch and open a PR against {state['target_branch']}:
+   gh pr create --base {state['target_branch']} --head <branch> --fill
 7. Write all commit messages, the PR title/description, and any code comments in English.
 
 When you are finished, clearly state in your final answer: the exact name of
@@ -308,7 +358,7 @@ def route_after_verify(state: GraphState) -> Literal["proceed", "retry", "blocke
 
 
 def _build_review_prompt(state: GraphState, diff: str) -> str:
-    return f"""Review the following diff (branch {state['branch']} vs main) in a repo
+    return f"""Review the following diff (branch {state['branch']} vs {state['target_branch']}) in a repo
 with this stack: {state['stack_description']}
 
 Check specifically for: {state['review_focus']}
@@ -334,14 +384,14 @@ async def _review_with_gemini(state: GraphState) -> tuple[str, str]:
     # several of these concurrently across repos.
     diff = await asyncio.to_thread(
         lambda: subprocess.run(
-            ["git", "-C", state["repo_path"], "diff", f"main...{state['branch']}"],
+            ["git", "-C", state["repo_path"], "diff", f"{state['target_branch']}...{state['branch']}"],
             capture_output=True,
             text=True,
             check=True,
         ).stdout
     )
     if not diff.strip():
-        raise RuntimeError(f"Empty diff for branch {state['branch']} vs main - nothing to review")
+        raise RuntimeError(f"Empty diff for branch {state['branch']} vs {state['target_branch']} - nothing to review")
 
     try:
         with Timer() as t:
@@ -366,7 +416,7 @@ async def _review_with_claude(state: GraphState) -> tuple[str, str]:
     # unavailable or misconfigured.
     prompt = f"""
 Review the changes on branch {state['branch']} in this repo
-(e.g. `git diff main...{state['branch']}`). Stack: {state['stack_description']}
+(e.g. `git diff {state['target_branch']}...{state['branch']}`). Stack: {state['stack_description']}
 
 Check specifically for: {state['review_focus']}
 

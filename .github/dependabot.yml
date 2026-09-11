@@ -1,0 +1,16 @@
+version: 2
+
+updates:
+  # Native uv support (understands pyproject.toml + uv.lock directly) - this
+  # is the exact class of gap that let a wrong Gemini/Groq SDK behavior sit
+  # unnoticed: nothing was ever proposing version bumps here to begin with.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore"
+
+# No github-actions entry yet - this repo has no .github/workflows/ (no CI
+# at all currently). Add one here once orchestrator gets its own CI.

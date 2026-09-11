@@ -1,10 +1,10 @@
 from dotenv import load_dotenv
 load_dotenv(override=True)
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from events import connected
 from pydantic import BaseModel
 import asyncio
-import json
 from lead import run_lead
 
 app = FastAPI()
@@ -29,8 +29,9 @@ def ping():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    counter = 0
-    while True:
-        await websocket.send_text(json.dumps({"counter": counter}))
-        counter += 1
-        await asyncio.sleep(1)
+    connected.append(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # tylko żeby wykryć rozłączenie
+    except WebSocketDisconnect:
+        connected.remove(websocket)

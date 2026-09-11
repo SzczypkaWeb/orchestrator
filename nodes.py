@@ -7,6 +7,7 @@ from schemas import CLASSIFY_SCHEMA, WRITER_SCHEMA, REVIEW_SCHEMA
 from retry import with_retry, TransientError, TRANSIENT_STATUS_CODES
 from providers import complete_with_groq, complete_with_gemini
 from telemetry import record_metric, Timer
+from events import broadcast
 
 # Reviewer is deliberately a different model family than the writer (Claude) -
 # a second Claude call reviewing Claude's own output shares the same blind
@@ -50,6 +51,10 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
                 provider=provider_name, model="default", duration_ms=t.duration_ms,
                 success=True, input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"),
             )
+            await broadcast({
+                "run_id": state["run_id"], "repo": state["repo"], "node": "classify_task",
+                "provider": provider_name, "status": "success",
+            })
             break
         except Exception as e:
             print(f"[classify_task] {provider_name} failed ({e}), trying next provider...")
@@ -58,6 +63,10 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
                 provider=provider_name, model="default", duration_ms=0,
                 success=False, error_message=str(e),
             )
+            await broadcast({
+                "run_id": state["run_id"], "repo": state["repo"], "node": "classify_task",
+                "provider": provider_name, "status": "failed", "detail": str(e),
+            })
 
     if complexity is None:
         haiku_model = "claude-haiku-4-5"
@@ -82,6 +91,10 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
                         total_cost_usd=message.total_cost_usd,
                         error_message=message.result if message.is_error else None,
                     )
+                    await broadcast({
+                        "run_id": state["run_id"], "repo": state["repo"], "node": "classify_task",
+                        "provider": "claude", "status": "failed" if message.is_error else "success",
+                    })
 
     model = "claude-haiku-4-5" if complexity == "simple_crud" else "claude-sonnet-5"
     return {**state, "writer_model": model}
@@ -233,6 +246,10 @@ pr_url: {continue_pr_url}
                 provider="local", model="git", duration_ms=0, success=False,
                 error_message=stale_warning,
             )
+            await broadcast({
+                "run_id": state["run_id"], "repo": state["repo"], "node": "writer",
+                "provider": "local", "status": "blocked", "detail": stale_warning,
+            })
             raise RuntimeError(f"Refusing to start new work on '{state['repo']}': {stale_warning}")
 
         prompt = f"""
@@ -286,6 +303,10 @@ the branch you created, and the full URL of the pull request you opened.
                     total_cost_usd=message.total_cost_usd,
                     error_message=message.result if message.is_error else None,
                 )
+                await broadcast({
+                    "run_id": state["run_id"], "repo": state["repo"], "node": "writer",
+                    "provider": "claude", "status": "failed" if message.is_error else "success",
+                })
                 if message.is_error:
                     if message.api_error_status in TRANSIENT_STATUS_CODES:
                         raise TransientError(f"{message.api_error_status}: {message.result}")
@@ -344,6 +365,10 @@ async def run_verification(state: GraphState) -> GraphState:
         provider="local", model="pnpm", duration_ms=t.duration_ms, success=passed,
         error_message=None if passed else output[:2000],
     )
+    await broadcast({
+        "run_id": state["run_id"], "repo": state["repo"], "node": "verify",
+        "provider": "local", "status": "success" if passed else "failed",
+    })
 
     verify_attempts = state.get("verify_attempts", 0) + (0 if passed else 1)
     return {**state, "verify_passed": passed, "verify_output": output, "verify_attempts": verify_attempts}
@@ -401,12 +426,20 @@ async def _review_with_gemini(state: GraphState) -> tuple[str, str]:
             run_id=state["run_id"], repo=state["repo"], node="security_review",
             provider="gemini", model="default", duration_ms=0, success=False, error_message=str(e),
         )
+        await broadcast({
+            "run_id": state["run_id"], "repo": state["repo"], "node": "security_review",
+            "provider": "gemini", "status": "failed", "detail": str(e),
+        })
         raise
     await record_metric(
         run_id=state["run_id"], repo=state["repo"], node="security_review",
         provider="gemini", model="default", duration_ms=t.duration_ms, success=True,
         input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"),
     )
+    await broadcast({
+        "run_id": state["run_id"], "repo": state["repo"], "node": "security_review",
+        "provider": "gemini", "status": "success", "detail": result["verdict"],
+    })
     return result["verdict"], result["notes"]
 
 
@@ -451,6 +484,10 @@ explaining the reasoning behind your verdict.
                     total_cost_usd=message.total_cost_usd,
                     error_message=message.result if message.is_error else None,
                 )
+                await broadcast({
+                    "run_id": state["run_id"], "repo": state["repo"], "node": "security_review",
+                    "provider": "claude", "status": "failed" if message.is_error else "success",
+                })
                 if message.is_error:
                     if message.api_error_status in TRANSIENT_STATUS_CODES:
                         raise TransientError(f"{message.api_error_status}: {message.result}")

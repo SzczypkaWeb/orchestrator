@@ -50,5 +50,5 @@ urllib3==2.7.0
 uuid_utils==0.17.0
 uvicorn==0.52.4
 websockets==17.1
-xxhash==3.8.1
+xxhash==4.0.1
 zstandard==0.25.0

@@ -88,3 +88,10 @@ async def run_lead(high_level_task: str) -> None:
             print(f"  Verify passed: {result.get('verify_passed')}")
             print(f"  Verdict: {result['review_verdict']}")
             print(f"  Notes: {result['review_notes']}")
+
+async def run_single(repo: str, task: str) -> None:
+    result = await compiled.ainvoke(initial_state_for(repo, task))
+    print(f"[{repo}] Branch: {result['branch']}")
+    print(f"  PR: {result['pr_url']}")
+    print(f"  Verify passed: {result.get('verify_passed')}")
+    print(f"  Verdict: {result['review_verdict']}")

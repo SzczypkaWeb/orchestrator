@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Button, Select, TextArea } from '@szczypkaweb/shared-ui';
 import useRepoOptions from './hooks/useRepoOptions';
 import { triggerRun } from './api/runs';
-import useOrchestratorEvents from './hooks/useOrchestratorEvents';
+import {useOrchestratorEvents} from './hooks/useOrchestratorEvents';
 
 const schema = z.object({
 	task: z
@@ -19,7 +19,7 @@ type FormValues = z.infer<typeof schema>;
 
 function App() {
 	const { options: repoOptions, isError: reposFailedToLoad } = useRepoOptions();
-	const { events, status } = useOrchestratorEvents();
+	const { status } = useOrchestratorEvents();
 
 	const {
 		register,

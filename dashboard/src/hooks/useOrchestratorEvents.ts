@@ -53,6 +53,7 @@ export function useOrchestratorEvents() {
       }
 
       ws.onclose = () => {
+        if(socketRef.current !== null) return
         socketRef.current = null
         setStatus('closed')
         if (unmountedRef.current) return

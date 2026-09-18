@@ -14,5 +14,5 @@ dependencies = [
     # DB dependency, deliberately a plain driver rather than an ORM.
     "asyncpg>=0.30.0",
     "fastapi>=0.141.1",
-    "uvicorn>=0.52.4",
+    "uvicorn>=0.53.0",
 ]

@@ -1,15 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ConnectionStatus, OrchestratorEvent } from '../../types/orchestrator'
 
-export type ConnectionStatus = 'connecting' | 'open' | 'closed'
-
-export interface OrchestratorEvent {
-  run_id: string
-  repo: string
-  node: string
-  provider: string
-  status: 'success' | 'failed' | 'blocked'
-  detail?: string
-}
 
 const WS_URL = import.meta.env.VITE_ORCHESTRATOR_API_URL.replace(/^http/, 'ws') + '/ws'
 

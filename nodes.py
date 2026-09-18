@@ -303,9 +303,11 @@ the branch you created, and the full URL of the pull request you opened.
                     total_cost_usd=message.total_cost_usd,
                     error_message=message.result if message.is_error else None,
                 )
+                event_pr_url = message.structured_output.get("pr_url") if (not message.is_error and message.structured_output) else None
                 await broadcast({
                     "run_id": state["run_id"], "repo": state["repo"], "node": "writer",
                     "provider": "claude", "status": "failed" if message.is_error else "success",
+                    "pr_url": event_pr_url,
                 })
                 if message.is_error:
                     if message.api_error_status in TRANSIENT_STATUS_CODES:

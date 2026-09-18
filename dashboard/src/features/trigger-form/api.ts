@@ -1,4 +1,5 @@
-import { apiFetch } from "./client";
+import { apiFetch } from "../../api/client";
+
 
 export interface ReposResponse {
   repos: string[];

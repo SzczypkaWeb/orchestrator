@@ -11,9 +11,10 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
-    "@szczypkaweb/shared-ui": "^0.4.0",
+    "@szczypkaweb/shared-ui": "^0.10.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.102.8",
+    "@tanstack/react-virtual": "^3.14.13",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.88.0",

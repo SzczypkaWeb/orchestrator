@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchRepos } from "../api/repos";
+import { fetchRepos } from "./api";
 
 export interface RepoOption {
   label: string;

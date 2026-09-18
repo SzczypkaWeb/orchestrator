@@ -3,6 +3,7 @@ from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage
 from repos import REPOS, initial_state_for
 from graph import compiled
 from retry import with_retry, TransientError, TRANSIENT_STATUS_CODES
+from events import broadcast
 
 LEAD_SCHEMA = {
     "type": "object",
@@ -72,8 +73,22 @@ async def run_lead(high_level_task: str) -> None:
     for st in subtasks:
         print(f"  - {st['repo']}: {st['task']}")
 
+    # Build each subtask's state once (not inline in the gather() call below)
+    # so we can broadcast its "trigger" event - carrying the task text, since
+    # that's otherwise never persisted anywhere - right as each run starts,
+    # instead of leaving the UI with nothing to show until the first real
+    # node (classify_task) finishes several seconds later.
+    states = []
+    for st in subtasks:
+        state = initial_state_for(st["repo"], st["task"])
+        await broadcast({
+            "run_id": state["run_id"], "repo": state["repo"], "node": "trigger",
+            "provider": "user", "status": "success", "detail": st["task"],
+        })
+        states.append(state)
+
     results = await asyncio.gather(
-        *[compiled.ainvoke(initial_state_for(st["repo"], st["task"])) for st in subtasks],
+        *[compiled.ainvoke(state) for state in states],
         return_exceptions=True,
     )
 
@@ -90,7 +105,12 @@ async def run_lead(high_level_task: str) -> None:
             print(f"  Notes: {result['review_notes']}")
 
 async def run_single(repo: str, task: str) -> None:
-    result = await compiled.ainvoke(initial_state_for(repo, task))
+    state = initial_state_for(repo, task)
+    await broadcast({
+        "run_id": state["run_id"], "repo": state["repo"], "node": "trigger",
+        "provider": "user", "status": "success", "detail": task,
+    })
+    result = await compiled.ainvoke(state)
     print(f"[{repo}] Branch: {result['branch']}")
     print(f"  PR: {result['pr_url']}")
     print(f"  Verify passed: {result.get('verify_passed')}")

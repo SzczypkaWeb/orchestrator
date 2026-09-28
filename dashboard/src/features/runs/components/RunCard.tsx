@@ -1,7 +1,13 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import type { RunGroup } from '../types/orchestrator';
-import { Button, Card, Link, Spinner, StatusBadge } from '@szczypkaweb/shared-ui';
-import { nodeLabel, toBadgeStatus } from '../lib/nodeLabels';
+import {
+	Button,
+	Card,
+	Link,
+	Spinner,
+	StatusBadge,
+} from '@szczypkaweb/shared-ui';
+import type { RunGroup } from '../../../types/orchestrator';
+import { nodeLabel, toBadgeStatus } from '../nodeLabels';
 import RunDetailsModal from './RunDetailsModal';
 
 // How long a non-finished run can go without any new event before we stop
@@ -60,9 +66,12 @@ export default function RunCard({
 
 	const lastEventAt = Math.max(
 		0,
-		...Object.values(run.nodes).map((event) => (event.created_at ? new Date(event.created_at).getTime() : 0))
+		...Object.values(run.nodes).map((event) =>
+			event.created_at ? new Date(event.created_at).getTime() : 0,
+		),
 	);
-	const isStale = !isComplete && lastEventAt > 0 && Date.now() - lastEventAt > STALE_AFTER_MS;
+	const isStale =
+		!isComplete && lastEventAt > 0 && Date.now() - lastEventAt > STALE_AFTER_MS;
 
 	// The whole card opens the run-details modal (task description, full
 	// status breakdown, PR link, token/cost telemetry) - replaces the old
@@ -94,8 +103,15 @@ export default function RunCard({
 						onClick={(event) => event.stopPropagation()}>
 						{compact ? 'PR' : 'View PR'}
 					</Link>
-					{!compact && prStatusLoading && <Spinner size="small" label="Checking PR status..." />}
-					{prStatus && <span className="text-xs text-muted-foreground">({prStatus})</span>}
+					{!compact && prStatusLoading && (
+						<Spinner
+							size="small"
+							label="Checking PR status..."
+						/>
+					)}
+					{prStatus && (
+						<span className="text-xs text-muted-foreground">({prStatus})</span>
+					)}
 				</div>
 			)}
 
@@ -128,14 +144,21 @@ export default function RunCard({
 												event.stopPropagation();
 												onMarkComplete();
 											}}>
-											{markCompletePending ? 'Marking as done...' : 'Mark as done'}
+											{markCompletePending
+												? 'Marking as done...'
+												: 'Mark as done'}
 										</Button>
 									)}
 								</>
 							) : (
 								<>
-									<Spinner size="small" label="Working..." />
-									<span className="text-sm text-muted-foreground">Working...</span>
+									<Spinner
+										size="small"
+										label="Working..."
+									/>
+									<span className="text-sm text-muted-foreground">
+										Working...
+									</span>
 								</>
 							)}
 						</div>

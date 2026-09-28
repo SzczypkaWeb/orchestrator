@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import z from 'zod';
 import { Button, Select, TextArea } from '@szczypkaweb/shared-ui';
-import { triggerRun } from '../../api/runs';
+import { triggerRun } from '../runs/api';
 import useRepoOptions from './useRepoOptions';
 
 const schema = z.object({
@@ -60,9 +60,7 @@ export default function TriggerForm() {
 							options={repoOptions}
 							placeholder="Auto"
 							error={
-								reposFailedToLoad
-									? 'Could not load the repo list.'
-									: undefined
+								reposFailedToLoad ? 'Could not load the repo list.' : undefined
 							}
 							{...field}
 						/>

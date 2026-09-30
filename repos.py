@@ -29,8 +29,16 @@ _TAILWIND_CONSUMER_NOTE = (
 REPOS = {
     "backend": {
         "path": str(_SIBLINGS_DIR / "backend"),
-        "stack_description": "Nest.js + Prisma (PostgreSQL, hosted on Supabase). Deployed to GCP Cloud Run via Workload Identity Federation (keyless GitHub Actions auth, no static service-account keys). Run tests with `pnpm test`.",
-        "review_focus": "secrets in code, missing input validation, SQL injection, overly permissive CORS, missing tests for new logic. lint errors or eslint-disable comments suppressing type-safety rules without justification",
+        "stack_description": (
+            "Nest.js + Prisma (PostgreSQL, hosted on Supabase). Deployed to GCP Cloud "
+            "Run via Workload Identity Federation (keyless GitHub Actions auth, no "
+            "static service-account keys). Run tests with `pnpm test`."
+        ),
+        "review_focus": (
+            "secrets in code, missing input validation, SQL injection, overly "
+            "permissive CORS, missing tests for new logic. lint errors or "
+            "eslint-disable comments suppressing type-safety rules without justification"
+        ),
         "target_branch": "staging",
     },
     "frontend-shell": {

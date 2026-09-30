@@ -1,6 +1,8 @@
 import json
 from datetime import datetime, timezone
+
 from fastapi import WebSocket
+
 from telemetry import save_run_event
 
 connected: list[WebSocket] = []

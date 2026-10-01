@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import telemetry
 
+
 async def test_save_run_event_inserts_expected_row(monkeypatch):
     mock_conn = AsyncMock()
     mock_pool = MagicMock()

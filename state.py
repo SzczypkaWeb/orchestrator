@@ -1,5 +1,6 @@
 from typing import TypedDict
 
+
 class GraphState(TypedDict):
     task: str
     # REPOS key this run targets (backend, frontend-shell, ...) - see

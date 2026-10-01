@@ -1,16 +1,19 @@
 from dotenv import load_dotenv
+
 load_dotenv(override=True)
 
-import os
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from events import broadcast, connected
-from pydantic import BaseModel
 import asyncio
+import os
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from events import broadcast, connected
+from github import fetch_pr_status
 from lead import run_lead, run_single
 from repos import REPOS
 from telemetry import fetch_run_events, fetch_run_metrics
-from github import fetch_pr_status
 
 app = FastAPI()
 

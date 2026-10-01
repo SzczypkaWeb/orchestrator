@@ -16,3 +16,24 @@ dependencies = [
     "fastapi>=0.141.1",
     "uvicorn>=0.54.0",
 ]
+
+[dependency-groups]
+dev = ["ruff>=0.8.0"]
+
+# Deliberately conservative rule set for now (errors, pyflakes, import order)
+# rather than ruff's full opinionated default - this is what the post-edit
+# hook (.claude/settings.json) runs on every file change, so it needs to
+# stay fast and low-noise. Widen this later (e.g. add UP, BLE, ASYNC) as a
+# separate, deliberate cleanup pass rather than silently via a version bump.
+[tool.ruff]
+line-length = 130
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Both files call load_dotenv(override=True) before importing anything that
+# reads env vars at import time (settings, provider clients) - the import
+# order is deliberate, not a mistake E402 should flag.
+"control_server.py" = ["E402"]
+"main.py" = ["E402"]

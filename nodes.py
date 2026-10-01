@@ -1,13 +1,15 @@
 import asyncio
 import subprocess
 from typing import Literal
-from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage
-from state import GraphState
-from schemas import CLASSIFY_SCHEMA, WRITER_SCHEMA, REVIEW_SCHEMA
-from retry import with_retry, TransientError, TRANSIENT_STATUS_CODES
-from providers import complete_with_groq, complete_with_gemini
-from telemetry import record_metric, Timer
+
+from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+
 from events import broadcast
+from providers import complete_with_gemini, complete_with_groq
+from retry import TRANSIENT_STATUS_CODES, TransientError, with_retry
+from schemas import CLASSIFY_SCHEMA, REVIEW_SCHEMA, WRITER_SCHEMA
+from state import GraphState
+from telemetry import Timer, record_metric
 
 # Reviewer is deliberately a different model family than the writer (Claude) -
 # a second Claude call reviewing Claude's own output shares the same blind
@@ -303,7 +305,11 @@ the branch you created, and the full URL of the pull request you opened.
                     total_cost_usd=message.total_cost_usd,
                     error_message=message.result if message.is_error else None,
                 )
-                event_pr_url = message.structured_output.get("pr_url") if (not message.is_error and message.structured_output) else None
+                event_pr_url = (
+                    message.structured_output.get("pr_url")
+                    if (not message.is_error and message.structured_output)
+                    else None
+                )
                 await broadcast({
                     "run_id": state["run_id"], "repo": state["repo"], "node": "writer",
                     "provider": "claude", "status": "failed" if message.is_error else "success",

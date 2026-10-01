@@ -1,12 +1,13 @@
 import argparse
 import asyncio
+
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-from repos import REPOS, initial_state_for, detect_repo_from_cwd
 from graph import compiled
 from lead import run_lead
+from repos import REPOS, detect_repo_from_cwd, initial_state_for
 
 
 def parse_args():
@@ -15,9 +16,18 @@ def parse_args():
     parser.add_argument(
         "--repo",
         choices=list(REPOS.keys()),
-        help="Defaults to auto-detecting from the current directory if you're running this from inside a known repo (see repos.py / README)",
+        help=(
+            "Defaults to auto-detecting from the current directory if you're "
+            "running this from inside a known repo (see repos.py / README)"
+        ),
     )
-    parser.add_argument("--branch", help="Continue an existing branch/PR instead of starting a new one (requires --pr-url; not compatible with --lead)")
+    parser.add_argument(
+        "--branch",
+        help=(
+            "Continue an existing branch/PR instead of starting a new one "
+            "(requires --pr-url; not compatible with --lead)"
+        ),
+    )
     parser.add_argument("--pr-url", help="URL of the existing PR being fixed (used together with --branch)")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--task")

@@ -1,7 +1,8 @@
 import json
 import os
-from groq import Groq
+
 from google import genai
+from groq import Groq
 
 # Mirrors ai-service/providers.py's pattern (same two providers, same idea:
 # cheap/fast structured JSON completion, no agentic tool use). Kept as a

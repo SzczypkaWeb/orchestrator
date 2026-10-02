@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "claude-agent-sdk>=0.2.160",
+    "claude-agent-sdk>=0.2.161",
     "langgraph>=1.2.12",
     "groq>=1.7.0",
     "google-genai>=2.25.0",

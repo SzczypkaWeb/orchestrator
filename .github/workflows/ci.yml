@@ -1,0 +1,51 @@
+name: CI
+
+# Python lint + tests for the orchestrator. The secret scan lives in its own
+# workflow (secret-scan.yml) on purpose: it must keep running even if this one
+# is broken or renamed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only, no secrets, no OIDC - nothing here needs more, and it keeps the
+# workflow safe to run on Dependabot PRs (which get a restricted token anyway).
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job id is the required-status-check name in branch protection / rulesets.
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Full tag on purpose: setup-uv no longer publishes moving major tags
+      # (@v10). Dependabot (github-actions ecosystem) keeps this current.
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+
+      # Python version comes from .python-version (3.12) - LangGraph has had
+      # compatibility problems with 3.13+, so don't let CI float to "latest".
+      # --locked fails the build if uv.lock is out of sync with pyproject.toml
+      # (exactly the drift that once made `uv run pytest` fail on a fresh clone).
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      # No API keys or database are provided to this step on purpose: the suite
+      # stubs the broadcast layer and mocks asyncpg, so it must pass without
+      # any of them. If a test starts needing a secret, that is a bug in the
+      # test, not a reason to add one here.
+      - name: Test (pytest)
+        run: uv run pytest -q

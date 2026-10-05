@@ -166,8 +166,8 @@ The Python suite covers the control-server endpoints (using FastAPI's
 `TestClient` with the broadcast layer stubbed) and the telemetry/persistence layer
 (with `asyncpg` mocked), so it needs neither a database nor any API keys. There is
 no automated test coverage of the LLM nodes themselves; they are exercised by real
-runs. Besides the secret scan there is no other CI workflow yet (tests and lint do not run
-automatically).
+runs. CI (`.github/workflows/ci.yml`) runs `ruff check` and `pytest` on every PR and push to
+`main`, next to the secret scan; the dashboard's lint/build is not in CI yet.
 
 ## Safety model
 

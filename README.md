@@ -166,7 +166,8 @@ The Python suite covers the control-server endpoints (using FastAPI's
 `TestClient` with the broadcast layer stubbed) and the telemetry/persistence layer
 (with `asyncpg` mocked), so it needs neither a database nor any API keys. There is
 no automated test coverage of the LLM nodes themselves; they are exercised by real
-runs. There is no CI workflow in this repo yet.
+runs. Besides the secret scan there is no other CI workflow yet (tests and lint do not run
+automatically).
 
 ## Safety model
 
@@ -186,8 +187,9 @@ Be explicit about what this tool does, because it is the reason it is not public
 - Secrets live only in `.env` (gitignored). Never commit it; `.env.example` holds
   placeholders only.
 
-Planned hardening: ephemeral sandboxed execution, authentication on the control
-server, and CI secret scanning.
+CI scans the full git history for secrets on every PR
+(`.github/workflows/secret-scan.yml`, gitleaks). Planned hardening: ephemeral
+sandboxed execution and authentication on the control server.
 
 ## Repository layout
 

@@ -1,5 +1,5 @@
 import type { OrchestratorEvent } from '../../types/orchestrator';
-import type { StatusBadgeStatus } from '@szczypkaweb/shared-ui';
+import type { BadgeStatus } from '@/components/ui/badge';
 
 // Shared between RunCard (inline per-node badges on the full/active card)
 // and RunDetailsModal (full node-by-node breakdown for any run, including
@@ -21,7 +21,7 @@ export function nodeLabel(node: string): string {
 
 export function toBadgeStatus(
 	status: OrchestratorEvent['status'],
-): StatusBadgeStatus {
+): BadgeStatus {
 	if (status === 'success') return 'done';
 	return status;
 }

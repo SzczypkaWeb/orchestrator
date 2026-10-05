@@ -2,7 +2,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useRef } from 'react';
 import { useRunList } from './useRunList';
 import type { OrchestratorEvent } from '../../types/orchestrator';
-import { SidePanel, Spinner } from '@szczypkaweb/shared-ui';
+import { Spinner } from '@/components/ui/spinner';
 import RunCard from './components/RunCard';
 
 export function RunsPanel({ events }: { events: OrchestratorEvent[] }) {
@@ -19,16 +19,17 @@ export function RunsPanel({ events }: { events: OrchestratorEvent[] }) {
 
 	return (
 		<aside className="fixed top-4 right-4 bottom-4">
-			<SidePanel className="h-full">
+			{/* Page chrome (not a floating surface): transparent, border only. */}
+			<div className="flex h-full w-72 flex-col border-r border-border bg-transparent text-foreground">
 				{historyLoading ? (
 					<div className="flex items-center justify-center gap-2 p-6">
-						<Spinner size="small" />
+						<Spinner />
 						<span className="text-sm text-muted-foreground">
 							Loading history...
 						</span>
 					</div>
 				) : (
-					<div className="flex h-full flex-col">
+					<div className="flex min-h-0 flex-1 flex-col">
 						{activeRuns.length > 0 && (
 							<div className="flex max-h-[50%] flex-col gap-2 overflow-y-auto border-b border-border p-3">
 								<p className="text-xs font-semibold uppercase text-muted-foreground">
@@ -101,7 +102,7 @@ export function RunsPanel({ events }: { events: OrchestratorEvent[] }) {
 						</div>
 					</div>
 				)}
-			</SidePanel>
+			</div>
 		</aside>
 	);
 }

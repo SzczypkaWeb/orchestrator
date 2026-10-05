@@ -1,16 +1,128 @@
 @import "tailwindcss";
-@import "@szczypkaweb/shared-ui/globals.css";
-@source "../node_modules/@szczypkaweb/shared-ui/dist";
 
+/*
+ * Design tokens (shadcn/ui convention): raw HSL triplets in :root / .dark,
+ * mapped into Tailwind's theme via @theme inline. Owned by this app - dark mode
+ * is driven by a `.dark` class on <html> (see main.tsx), not by the media query.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Light theme tokens. `--border`/`--input` are deliberately darker than shadcn's default:
+ * inputs are `bg-transparent`, so the border is their only visible boundary. */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+
+  /*
+   * `--border`/`--input` are intentionally darker than the original
+   * shadcn/ui slate-200 default (214.3 31.8% 91.4%, ~1.2:1 contrast against
+   * `--background`). Components like `TextArea`/`Select` now render with a
+   * transparent background instead of `--background`, so the border is
+   * their only visible boundary - it needs to actually read as a border
+   * against arbitrary surfaces, not just the page background.
+   */
+  --border: 215 20.2% 65.1%;
+  --input: 215 20.2% 65.1%;
+  --ring: 222.2 84% 4.9%;
+
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+
+  --radius: 0.5rem;
+}
+
+/*
+ * Dark-mode overrides for the tokens above, activated by adding the `.dark`
+ * class to an ancestor element (see `@custom-variant dark` below) - not tied
+ * to `prefers-color-scheme`, so consumer apps can toggle it under explicit
+ * user control (e.g. a theme switcher persisted in localStorage) as well as
+ * seed it from `prefers-color-scheme` if they want to.
+ *
+ * Every token declared in `:root` above must have a corresponding override
+ * here so that components consuming the semantic Tailwind classes (
+ * `bg-background`, `text-foreground`, `border-input`, etc.) repaint via CSS
+ * alone, with no theme-related props/logic in the components themselves.
+ */
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+
+  --border: 215.3 19.3% 34.5%;
+  --input: 215.3 19.3% 34.5%;
+  --ring: 212.7 26.8% 83.9%;
+
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+}
+
+/*
+ * Maps the raw HSL-triplet CSS variables above into Tailwind v4's theme
+ * namespace, so utility classes like `bg-primary`, `text-muted-foreground`,
+ * `rounded-lg` etc. get generated from them. `inline` because the values
+ * reference other CSS variables (hsl(var(--x))) rather than being static.
+ */
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+/* --- page styles --- */
 :root {
   --text: #6b6375;
   --text-h: #08060d;
   --bg: #fff;
-  --border: #e5e4e7;
+  --app-border: #e5e4e7;
   --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
+  --app-accent: #aa3bff;
+  --app-accent-bg: rgba(170, 59, 255, 0.1);
+  --app-accent-border: rgba(170, 59, 255, 0.5);
   --social-bg: rgba(244, 243, 236, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
@@ -39,11 +151,11 @@
     --text: #9ca3af;
     --text-h: #f3f4f6;
     --bg: #16171d;
-    --border: #2e303a;
+    --app-border: #2e303a;
     --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
+    --app-accent: #c084fc;
+    --app-accent-bg: rgba(192, 132, 252, 0.15);
+    --app-accent-border: rgba(192, 132, 252, 0.5);
     --social-bg: rgba(47, 48, 58, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
@@ -59,7 +171,7 @@
   max-width: 100%;
   margin: 0 auto;
   text-align: center;
-  border-inline: 1px solid var(--border);
+  border-inline: 1px solid var(--app-border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;

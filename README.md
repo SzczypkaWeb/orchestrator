@@ -125,10 +125,9 @@ API surface (`control_server.py`): `POST /runs`, `GET /runs`,
 The frontend is organised by feature (`src/features/{runs,trigger-form,connection-status}`)
 rather than by file type; `App.tsx` is only a composition root.
 
-> **Known limitation:** the dashboard imports `@szczypkaweb/shared-ui` from GitHub
-> Packages, which requires a token even to install. Outsiders cannot
-> `pnpm install` it yet; publishing the UI kit to the public npm registry is on the
-> to-do list.
+The UI is built from [shadcn/ui](https://ui.shadcn.com)-style components (Radix primitives +
+Tailwind v4) that live in `dashboard/src/components/ui/` as plain source, so
+`pnpm install` needs nothing but the public npm registry.
 
 ## Database (optional)
 
@@ -183,8 +182,7 @@ The Python suite covers the control-server endpoints (using FastAPI's
 `TestClient` with the broadcast layer stubbed) and the telemetry/persistence layer
 (with `asyncpg` mocked), so it needs neither a database nor any API keys. There is
 no automated test coverage of the LLM nodes themselves; they are exercised by real
-runs. Besides the secret scan there is no other CI workflow yet (tests and lint do not run
-automatically).
+runs. CI (`.github/workflows/`) runs the Python lint + tests, the dashboard lint + build, and the secret scan.
 
 ## Safety model
 

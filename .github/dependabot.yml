@@ -12,5 +12,11 @@ updates:
     commit-message:
       prefix: "chore"
 
-# No github-actions entry yet - this repo has no .github/workflows/ (no CI
-# at all currently). Add one here once orchestrator gets its own CI.
+  # Keeps the actions used in .github/workflows/ (actions/checkout, ...) current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"

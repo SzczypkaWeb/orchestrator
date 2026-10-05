@@ -88,7 +88,7 @@ Other flags: `--task-file <path>` (long task descriptions), `--branch <name>
 ### Run it from inside a repo
 
 If `--repo` is omitted, `main.py` matches your current directory against the
-registered repos (it also works from a subdirectory). A shell helper makes this
+configured repos (it also works from a subdirectory). A shell helper makes this
 convenient:
 
 ```bash
@@ -154,15 +154,22 @@ A test keeps `schema.sql` in sync with the SQL in `telemetry.py`.
 
 ## Configuring the repos it can operate on
 
-`repos.py` is the registry: for each repo it holds the path, a description of the
-stack and conventions (given to the writer), a `review_focus` checklist (given to
-the reviewer) and the `target_branch` PRs are opened against. Repos are expected
-to be **sibling directories** of this one. The registry currently describes the
-author's own projects - to use it on yours, edit `REPOS` (and keep the descriptions
-specific: they are the main lever on output quality). Each target repo's own
-`CLAUDE.md` and `.claude/skills/` are loaded by the writer, so project conventions
-live in the target repo, not here. Moving the registry to a YAML config file is a
-to-do.
+The registry is a YAML file, not code. Copy the template and edit it:
+
+```bash
+cp orchestrator.example.yaml orchestrator.yaml    # gitignored - your local setup
+```
+
+For each repo it holds the `path`, a `stack_description` (given to the writer), a
+`review_focus` checklist (given to the reviewer) and the `target_branch` PRs are
+opened against (default `main`). Relative paths resolve against the config file's
+directory, so `../my-api` means a sibling checkout. To keep the file elsewhere, set
+`ORCHESTRATOR_CONFIG=/path/to/file.yaml`. The file is parsed with `yaml.safe_load`
+and validated on startup (unknown keys, missing fields and empty values are
+rejected with a readable error). Keep the descriptions specific: they are the main
+lever on output quality. Each target repo's own `CLAUDE.md` and `.claude/skills/`
+are also loaded by the writer, so project conventions can live in the target repo.
+`examples/szczypka-web.yaml` is the author's real six-repo setup as a worked example.
 
 ## Tests and linting
 
@@ -208,7 +215,8 @@ sandboxed execution and authentication on the control server.
 | `graph.py`, `state.py` | LangGraph definition and shared run state |
 | `nodes.py` | `classify_task`, `run_writer`, `run_verification`, `run_security_review` and routing |
 | `lead.py` | Splits a task across repos and runs subtasks in parallel |
-| `repos.py` | Registry of repos the orchestrator can operate on |
+| `repos.py` | Loads and validates the repo registry from YAML |
+| `orchestrator.example.yaml`, `examples/` | Registry template and the author's worked example |
 | `providers.py`, `retry.py`, `schemas.py` | Provider clients, retry helper, structured-output schemas |
 | `events.py`, `telemetry.py` | Event broadcast/persistence and cost telemetry |
 | `github.py` | PR status through the `gh` CLI |

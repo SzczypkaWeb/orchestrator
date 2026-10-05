@@ -19,7 +19,7 @@ dashboard (`dashboard/`, see its own conventions in
   `pnpm typecheck` covers the TS side.
 
 ## Structure
-- `repos.py` — repo registry (path, stack description, review checklist).
+- `repos.py` — loads/validates the repo registry from YAML (`orchestrator.yaml`, gitignored; template: `orchestrator.example.yaml`). Tests use the example via `conftest.py`.
 - `state.py` — graph state type (`GraphState`).
 - `schemas.py` — JSON schemas for structured output.
 - `nodes.py` — agent logic (`classify_task`, `run_writer`, `run_security_review`).

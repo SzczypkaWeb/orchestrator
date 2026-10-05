@@ -1,0 +1,29 @@
+# Copy to `orchestrator.yaml` (gitignored) and edit, or point the
+# ORCHESTRATOR_CONFIG env var at a file anywhere on disk.
+#
+# Relative `path` values resolve against this file's directory, so
+# `../my-api` means "a sibling checkout of the orchestrator". Absolute paths
+# and `~/...` work too.
+#
+# The descriptions are the main lever on output quality: `stack_description`
+# is given to the writer agent, `review_focus` to the reviewer. Be specific
+# about conventions, commands and pitfalls. (Each repo's own CLAUDE.md is also
+# loaded by the writer, so project rules can live there instead.)
+#
+# A description may be a plain string, a folded block (`>-`, as below) or a
+# list of strings (joined with spaces).
+repos:
+  my-api:
+    path: ../my-api
+    target_branch: main        # PRs are opened against this branch (default: main)
+    stack_description: >-
+      Node.js + Express + PostgreSQL. Run tests with `pnpm test`, lint with `pnpm lint`.
+    review_focus: >-
+      secrets in code, missing input validation, SQL injection, missing tests for new logic
+
+  my-web:
+    path: ../my-web
+    stack_description:
+      - React + TypeScript + Vite.
+      - Run tests with `pnpm test`.
+    review_focus: hardcoded API keys in client code, XSS, missing tests

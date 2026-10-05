@@ -1,0 +1,16 @@
+title = "orchestrator gitleaks config"
+
+# Start from gitleaks' built-in ruleset (API keys, tokens, private keys,
+# connection strings with passwords, ...) and only add narrow exceptions below.
+[extend]
+useDefault = true
+
+# Keep exceptions as small and explicit as possible: every entry here is a place
+# a real secret could hide. Never allowlist .env files - they must not be tracked.
+[[allowlists]]
+description = "Lockfiles hold package integrity hashes, which look like high-entropy secrets but are not."
+paths = [
+  '''(^|/)uv\.lock$''',
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)package-lock\.json$''',
+]

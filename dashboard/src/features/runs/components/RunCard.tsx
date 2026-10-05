@@ -1,11 +1,9 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import {
-	Button,
-	Card,
-	Link,
-	Spinner,
-	StatusBadge,
-} from '@szczypkaweb/shared-ui';
+import { ExternalLink } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
 import type { RunGroup } from '../../../types/orchestrator';
 import { nodeLabel, toBadgeStatus } from '../nodeLabels';
 import RunDetailsModal from './RunDetailsModal';
@@ -91,23 +89,25 @@ export default function RunCard({
 				<p className="text-sm text-muted-foreground">
 					{run.repo} · {run.runId.slice(0, 8)}
 				</p>
-				{compact && <StatusBadge status="done" />}
+				{compact && <Badge status="done" />}
 			</div>
 
 			{prUrl && (
 				<div className="mt-2 flex items-center gap-2">
-					<Link
+					<a
 						href={prUrl}
-						external
-						className={compact ? 'text-xs' : 'text-sm'}
+						target="_blank"
+						rel="noreferrer noopener"
+						className={`inline-flex items-center gap-1 text-primary hover:underline ${compact ? 'text-xs' : 'text-sm'}`}
 						onClick={(event) => event.stopPropagation()}>
 						{compact ? 'PR' : 'View PR'}
-					</Link>
-					{!compact && prStatusLoading && (
-						<Spinner
-							size="small"
-							label="Checking PR status..."
+						<ExternalLink
+							className="h-3 w-3"
+							aria-hidden
 						/>
+					</a>
+					{!compact && prStatusLoading && (
+						<Spinner label="Checking PR status..." />
 					)}
 					{prStatus && (
 						<span className="text-xs text-muted-foreground">({prStatus})</span>
@@ -124,21 +124,21 @@ export default function RunCard({
 								key={node}
 								className="flex items-center gap-1.5">
 								<span className="text-sm">{nodeLabel(node)}</span>
-								<StatusBadge status={toBadgeStatus(event.status)} />
+								<Badge status={toBadgeStatus(event.status)} />
 							</div>
 						))}
 					{!isComplete && (
 						<div className="flex items-center gap-1.5">
 							{isStale ? (
 								<>
-									<span className="text-sm text-amber-600">
+									<span className="text-sm text-amber-600 dark:text-amber-400">
 										⚠ No update in a while - may have been interrupted
 									</span>
 									{onMarkComplete && (
 										<Button
 											type="button"
 											variant="secondary"
-											size="small"
+											size="sm"
 											disabled={markCompletePending}
 											onClick={(event) => {
 												event.stopPropagation();
@@ -152,10 +152,7 @@ export default function RunCard({
 								</>
 							) : (
 								<>
-									<Spinner
-										size="small"
-										label="Working..."
-									/>
+									<Spinner label="Working..." />
 									<span className="text-sm text-muted-foreground">
 										Working...
 									</span>
@@ -171,7 +168,6 @@ export default function RunCard({
 	return (
 		<>
 			<Card
-				padding="compact"
 				role="button"
 				tabIndex={0}
 				onClick={() => setDetailsOpen(true)}

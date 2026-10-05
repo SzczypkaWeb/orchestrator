@@ -1,0 +1,39 @@
+name: Dashboard
+
+# Lint + type-check + production build of the React dashboard. No secrets and no
+# registry tokens: every dependency comes from the public npm registry (the UI
+# components are shadcn/ui-style source owned by this repo, not a private package).
+on:
+  push:
+    branches: [main]
+    paths: ['dashboard/**', '.github/workflows/dashboard.yml']
+  pull_request:
+    paths: ['dashboard/**', '.github/workflows/dashboard.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: dashboard/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: dashboard/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm build   # tsc -b && vite build

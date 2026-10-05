@@ -6,7 +6,11 @@ export interface RepoOption {
   value: string;
 }
 
-const AUTO_OPTION: RepoOption = { label: "Auto (let Claude decide)", value: "" };
+// Radix Select reserves the empty string (it means "clear the selection"), so the
+// "no explicit repo" choice uses a sentinel that the form maps back to undefined.
+export const AUTO_REPO = "auto";
+
+const AUTO_OPTION: RepoOption = { label: "Auto (let Claude decide)", value: AUTO_REPO };
 
 
 export default function useRepoOptions() {

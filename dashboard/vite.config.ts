@@ -1,3 +1,4 @@
+import path from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
@@ -8,4 +9,5 @@ export default defineConfig({
   // reference silently produces no working Tailwind plugin (no build error,
   // just none of the utility classes ever actually get generated).
   plugins: [react(), tailwindcss()],
+  resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
 })

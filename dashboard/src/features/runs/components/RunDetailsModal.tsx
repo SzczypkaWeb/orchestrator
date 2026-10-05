@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, Modal, Spinner, StatusBadge } from '@szczypkaweb/shared-ui';
+import { ExternalLink } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 import type { RunGroup } from '../../../types/orchestrator';
 import { fetchRunMetrics } from '../api';
 import { nodeLabel, toBadgeStatus } from '../nodeLabels';
@@ -45,11 +48,13 @@ export default function RunDetailsModal({
 	});
 
 	return (
-		<Modal
+		<Dialog
 			open={open}
-			onOpenChange={onOpenChange}
-			title={`${run.repo} · ${run.runId.slice(0, 8)}`}
-			size="lg">
+			onOpenChange={onOpenChange}>
+			<DialogContent
+				// Radix warns when a dialog has no description; none is needed here.
+				aria-describedby={undefined}>
+				<DialogTitle>{`${run.repo} · ${run.runId.slice(0, 8)}`}</DialogTitle>
 			<div className="flex flex-col gap-4">
 				{taskDescription && (
 					<section>
@@ -74,7 +79,7 @@ export default function RunDetailsModal({
 									key={node}
 									className="flex items-center gap-1.5">
 									<span className="text-sm">{nodeLabel(node)}</span>
-									<StatusBadge status={toBadgeStatus(event.status)} />
+									<Badge status={toBadgeStatus(event.status)} />
 								</div>
 							))}
 					</div>
@@ -86,12 +91,17 @@ export default function RunDetailsModal({
 							Pull request
 						</h4>
 						<div className="mt-1 flex items-center gap-2">
-							<Link
+							<a
 								href={prUrl}
-								external
-								className="text-sm">
+								target="_blank"
+								rel="noreferrer noopener"
+								className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
 								View PR
-							</Link>
+								<ExternalLink
+									className="h-3.5 w-3.5"
+									aria-hidden
+								/>
+							</a>
 							{prStatus && (
 								<span className="text-xs text-muted-foreground">
 									({prStatus})
@@ -107,7 +117,7 @@ export default function RunDetailsModal({
 					</h4>
 					{metricsLoading ? (
 						<div className="mt-2 flex items-center gap-2">
-							<Spinner size="small" />
+							<Spinner />
 							<span className="text-sm text-muted-foreground">
 								Loading metrics...
 							</span>
@@ -135,7 +145,7 @@ export default function RunDetailsModal({
 										<span>{formatDuration(metric.durationMs)}</span>
 									</div>
 									{!metric.success && metric.errorMessage && (
-										<p className="text-xs text-red-600">
+										<p className="text-xs text-destructive">
 											{metric.errorMessage}
 										</p>
 									)}
@@ -149,6 +159,7 @@ export default function RunDetailsModal({
 					)}
 				</section>
 			</div>
-		</Modal>
+			</DialogContent>
+		</Dialog>
 	);
 }

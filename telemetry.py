@@ -4,35 +4,63 @@ import uuid
 
 import asyncpg
 
-# Reuses backend's own DATABASE_URL (Supabase Postgres) - see
-# backend/prisma/schema.prisma's ExecutionMetric model for the table shape,
-# migrated the normal Prisma way even though the orchestrator itself writes
-# to it directly over asyncpg (no Node/Prisma runtime here). Table/column
-# names below are quoted to match Prisma's default casing exactly
-# (ExecutionMetric, runId, inputTokens, ...) - Postgres folds unquoted
-# identifiers to lowercase, which would silently miss the real table.
+# Optional Postgres persistence (run history + cost telemetry). Table/column
+# names below are quoted to match the DDL in schema.sql exactly (ExecutionMetric,
+# runId, inputTokens, ...) - Postgres folds unquoted identifiers to lowercase,
+# which would silently miss the real table. schema.sql is a plain-SQL copy of
+# the Prisma migrations in the sibling `backend` project, so you can either point
+# DATABASE_URL at backend's database (nothing to create) or load schema.sql into
+# any empty Postgres.
+#
+# DATABASE_URL is OPTIONAL. Without it the orchestrator still runs end to end:
+# writes are skipped and reads come back empty (see _get_pool), so the dashboard
+# works as a live-only view.
 
 _pool: asyncpg.Pool | None = None
+_warned_no_database = False
 
 
-async def _get_pool() -> asyncpg.Pool:
-    global _pool
+def database_configured() -> bool:
+    return bool(os.environ.get("DATABASE_URL"))
+
+
+async def _get_pool() -> asyncpg.Pool | None:
+    """The shared connection pool, or None when DATABASE_URL isn't set.
+
+    "Not configured" is a normal, supported mode (not an error): callers treat
+    None as "persistence is off". It is deliberately different from "configured
+    but unreachable", which still raises here (asyncpg's own error) so that a
+    broken database is never silently mistaken for an empty one.
+    """
+    global _pool, _warned_no_database
+    if not database_configured():
+        if not _warned_no_database:
+            print(
+                "[telemetry] DATABASE_URL is not set - run history and cost "
+                "telemetry are disabled (see schema.sql to enable them)."
+            )
+            _warned_no_database = True
+        return None
     if _pool is None:
         _pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], min_size=1, max_size=3)
     return _pool
+
 
 async def fetch_run_events() -> list[dict]:
     """All persisted RunEvent rows, oldest first - same flat shape as the
     live broadcast() events, so the frontend can feed both history and
     live events into the same useGroupedRuns logic.
 
-    Unlike save_run_event/record_metric, this is NOT best-effort: those
-    are side-effects that must never break an otherwise-successful run,
-    but this function's whole job is returning real data to GET /runs -
-    a failed read should surface as a real error there, not silently
-    come back as an empty/missing result.
+    Unlike save_run_event/record_metric, a failed read is NOT swallowed:
+    those are side-effects that must never break an otherwise-successful
+    run, but this function's whole job is returning real data to GET /runs -
+    an unreachable database should surface as a real error there, not
+    silently come back as an empty result. (No DATABASE_URL at all is
+    different: that is "persistence is off", so the history is just empty.)
     """
     pool = await _get_pool()
+    if pool is None:
+        return []
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
@@ -60,11 +88,12 @@ async def fetch_run_metrics(run_id: str) -> list[dict]:
     duration telemetry `record_metric` (below) already writes on every
     provider call, but which the dashboard has never surfaced anywhere until
     now (see the run-details modal). Same "not best-effort" contract as
-    fetch_run_events: this is a real read for a GET endpoint, so a failure
-    should surface as a real error rather than silently look like "no
-    metrics".
+    fetch_run_events: a failed read surfaces as a real error rather than
+    silently looking like "no metrics"; only a missing DATABASE_URL yields [].
     """
     pool = await _get_pool()
+    if pool is None:
+        return []
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
@@ -112,6 +141,8 @@ async def save_run_event(
     history write must never break the run itself."""
     try:
         pool = await _get_pool()
+        if pool is None:
+            return
         async with pool.acquire() as conn:
             await conn.execute(
                 """
@@ -151,6 +182,8 @@ async def record_metric(
     had a hiccup - errors are logged, not raised."""
     try:
         pool = await _get_pool()
+        if pool is None:
+            return
         async with pool.acquire() as conn:
             await conn.execute(
                 """

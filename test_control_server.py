@@ -120,3 +120,21 @@ def test_record_pr_merged_broadcasts_pr_merged_event(monkeypatch):
     assert captured["node"] == "pr_merged"
     assert captured["status"] == "success"
     assert captured["pr_url"] == "https://github.com/x/y/pull/1"
+
+def test_history_and_metrics_are_empty_not_500_without_database(monkeypatch):
+    """With no DATABASE_URL the dashboard is live-only: the history endpoints
+    answer 200 with empty data instead of failing."""
+    import telemetry
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(telemetry, "_pool", None)
+
+    client = TestClient(control_server.app)
+
+    history = client.get("/runs")
+    assert history.status_code == 200
+    assert history.json() == {"events": []}
+
+    metrics = client.get("/runs/abc123/metrics")
+    assert metrics.status_code == 200
+    assert metrics.json() == {"metrics": []}

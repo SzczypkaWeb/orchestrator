@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ruff>=0.8.0"]
+dev = ["ruff>=0.16.10"]
 
 # Deliberately conservative rule set for now (errors, pyflakes, import order)
 # rather than ruff's full opinionated default - this is what the post-edit

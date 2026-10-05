@@ -15,10 +15,19 @@ dependencies = [
     "asyncpg>=0.31.0",
     "fastapi>=0.142.2",
     "uvicorn>=0.54.0",
+    # imported directly by control_server.py / main.py (previously only present
+    # transitively, which made `uv sync` fragile).
+    "python-dotenv>=1.2.4",
 ]
 
 [dependency-groups]
-dev = ["ruff>=0.16.10"]
+dev = [
+    "ruff>=0.16.10",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    # fastapi.testclient.TestClient (test_control_server.py) needs httpx.
+    "httpx>=0.28.1",
+]
 
 # Deliberately conservative rule set for now (errors, pyflakes, import order)
 # rather than ruff's full opinionated default - this is what the post-edit

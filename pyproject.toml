@@ -18,6 +18,8 @@ dependencies = [
     # imported directly by control_server.py / main.py (previously only present
     # transitively, which made `uv sync` fragile).
     "python-dotenv>=1.2.4",
+    # repos.py reads the repo registry from YAML (yaml.safe_load).
+    "pyyaml>=6.0",
 ]
 
 [dependency-groups]

@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .env
 *.log
+
+# Local repo registry (see orchestrator.example.yaml)
+/orchestrator.yaml

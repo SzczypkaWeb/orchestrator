@@ -59,8 +59,8 @@ flowchart LR
   pipeline shells out to both.
 - Claude access: `claude login` (subscription) **or** `ANTHROPIC_API_KEY`.
 - `GROQ_API_KEY` and `GEMINI_API_KEY` (free tiers work).
-- Optional, for run history and the dashboard: a Postgres database (see
-  [Database](#database)).
+- Optional, for run history that survives restarts: a Postgres database (see
+  [Database](#database-optional)).
 
 ## Quick start
 
@@ -130,17 +130,27 @@ rather than by file type; `App.tsx` is only a composition root.
 > `pnpm install` it yet; publishing the UI kit to the public npm registry is on the
 > to-do list.
 
-## Database
+## Database (optional)
 
-Run history, telemetry and PR-merge persistence use Postgres via `asyncpg`
-(`DATABASE_URL`). The tables (`ExecutionMetric`, `RunEvent`, `OrchestratorRun`) are
-currently defined and migrated by a sibling project's Prisma schema, not by this
-repo. Without a database:
+Postgres is optional. It stores run history (`RunEvent`) and per-call cost telemetry
+(`ExecutionMetric`) via `asyncpg`, enabled by setting `DATABASE_URL`.
 
-- the CLI still works - telemetry writes are best-effort and only log a warning;
-- `GET /runs` and the dashboard's history/metrics views will fail.
+**Without `DATABASE_URL`** everything still works: runs execute normally, writes are
+skipped (one warning is logged), and `GET /runs` / `GET /runs/{id}/metrics` return
+empty lists, so the dashboard is a live-only view. History is gone on restart.
 
-A self-contained schema (`schema.sql`) is a to-do.
+**To enable history**, create the tables in any Postgres you control:
+
+```bash
+psql "$DATABASE_URL" -f schema.sql     # idempotent (IF NOT EXISTS)
+```
+
+`schema.sql` is a plain-SQL copy of the Prisma migrations of the author's sibling
+`backend` project, which shares this database in the author's setup; if you point
+`DATABASE_URL` at such a database the tables already exist. A configured-but-unreachable
+database is **not** treated as "empty": reads raise, so a broken connection can't be
+mistaken for a clean history (writes stay best-effort and never fail a run).
+A test keeps `schema.sql` in sync with the SQL in `telemetry.py`.
 
 ## Configuring the repos it can operate on
 

@@ -15,7 +15,7 @@ dashboard (`dashboard/`, see its own conventions in
 - `pytest` — unit tests (`test_*.py`, colocated with source).
 - `ruff check .` — lint (conservative rule set: `E`, `F`, `I` — see
   `pyproject.toml` for why).
-- No Python typecheck configured yet (no mypy) — dashboard's own
+- `uv run pyright`
   `pnpm typecheck` covers the TS side.
 
 ## Structure

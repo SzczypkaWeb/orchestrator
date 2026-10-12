@@ -29,6 +29,7 @@ dev = [
     "pytest-asyncio>=1.4.0",
     # fastapi.testclient.TestClient (test_control_server.py) needs httpx.
     "httpx>=0.28.1",
+    "pyright>=1.1.414",
 ]
 
 # Deliberately conservative rule set for now (errors, pyflakes, import order)
@@ -48,3 +49,12 @@ select = ["E", "F", "I"]
 # order is deliberate, not a mistake E402 should flag.
 "control_server.py" = ["E402"]
 "main.py" = ["E402"]
+
+
+[tool.pyright]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+exclude = [".venv", "dashboard", "**/__pycache__", "scratch_stream.py"]
+typeCheckingMode = "standard"
+strict = ["retry.py", "state.py", "github.py", "schemas.py", "events.py"]

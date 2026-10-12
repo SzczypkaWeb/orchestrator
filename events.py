@@ -8,7 +8,7 @@ from telemetry import save_run_event
 
 connected: list[WebSocket] = []
 
-EventStatus = Literal["succsess", "failed", "blocked"]
+EventStatus = Literal["success", "failed", "blocked"]
 
 class RunEvent(TypedDict):
     run_id: str

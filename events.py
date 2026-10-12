@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 from fastapi import WebSocket
 
@@ -8,12 +8,14 @@ from telemetry import save_run_event
 
 connected: list[WebSocket] = []
 
+EventStatus = Literal["succsess", "failed", "blocked"]
+
 class RunEvent(TypedDict):
     run_id: str
     repo: str
     node: str
     provider: str
-    status: str
+    status: EventStatus
     detail: NotRequired[str | None]
     pr_url: NotRequired[str | None]
     

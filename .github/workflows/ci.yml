@@ -42,7 +42,9 @@ jobs:
 
       - name: Lint (ruff)
         run: uv run ruff check .
-
+      
+      - name: Typecheck (pyright)
+        run: uv run pyright
       # No API keys or database are provided to this step on purpose: the suite
       # stubs the broadcast layer and mocks asyncpg, so it must pass without
       # any of them. If a test starts needing a secret, that is a bug in the

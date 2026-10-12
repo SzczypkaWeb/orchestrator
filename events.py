@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timezone
+from typing import NotRequired, TypedDict
 
 from fastapi import WebSocket
 
@@ -7,7 +8,16 @@ from telemetry import save_run_event
 
 connected: list[WebSocket] = []
 
-async def broadcast(event: dict) -> None:
+class RunEvent(TypedDict):
+    run_id: str
+    repo: str
+    node: str
+    provider: str
+    status: str
+    detail: NotRequired[str | None]
+    pr_url: NotRequired[str | None]
+    
+async def broadcast(event: RunEvent) -> None:
     # Persist the event exactly as given - save_run_event()'s signature
     # doesn't know about "created_at" (that timestamp comes from the DB's
     # own createdAt column, read back later via fetch_run_events()).

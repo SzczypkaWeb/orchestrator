@@ -97,7 +97,7 @@ async def run_lead(high_level_task: str) -> None:
     print("\n=== Results ===")
     for st, result in zip(subtasks, results):
         print(f"\n[{st['repo']}]")
-        if isinstance(result, Exception):
+        if isinstance(result, BaseException):
             print(f"  ERROR: {result}")
         else:
             print(f"  Branch: {result['branch']}")

@@ -6,9 +6,10 @@ from fastapi import WebSocket
 
 from telemetry import save_run_event
 
-connected: list[WebSocket] = []
+connected: set[WebSocket] = set()
 
 EventStatus = Literal["success", "failed", "blocked"]
+
 
 class RunEvent(TypedDict):
     run_id: str
@@ -18,7 +19,8 @@ class RunEvent(TypedDict):
     status: EventStatus
     detail: NotRequired[str | None]
     pr_url: NotRequired[str | None]
-    
+
+
 async def broadcast(event: RunEvent) -> None:
     # Persist the event exactly as given - save_run_event()'s signature
     # doesn't know about "created_at" (that timestamp comes from the DB's
@@ -31,12 +33,12 @@ async def broadcast(event: RunEvent) -> None:
     # backend process, not still-in-progress work).
     live_event = {**event, "created_at": datetime.now(timezone.utc).isoformat()}
 
-    dead: list[WebSocket] = []
-    for ws in connected:
+    for ws in list(connected):
         try:
             await ws.send_text(json.dumps(live_event))
         except Exception:
-            dead.append(ws)
+            disconnect(ws)
 
-    for ws in dead:
-        connected.remove(ws)
+
+def disconnect(ws: WebSocket) -> None:
+    connected.discard(ws)

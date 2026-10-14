@@ -1,13 +1,7 @@
 import pytest
 
 from nodes import route_after_review, route_after_verify
-from repos import REPOS, initial_state_for
 from state import GraphState
-
-
-@pytest.fixture
-def state() -> GraphState:
-    return initial_state_for(next(iter(REPOS)), "some task")
 
 
 @pytest.mark.parametrize(

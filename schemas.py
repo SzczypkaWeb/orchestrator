@@ -2,9 +2,10 @@
 # hand-written JSON schema dict to a Pydantic model: the model is the single
 # source of truth for the type (pyright), the runtime validation of what the
 # LLM actually returned, and the JSON schema handed to the provider.
+import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Classification(BaseModel):
@@ -20,14 +21,32 @@ class Classification(BaseModel):
 CLASSIFY_SCHEMA = Classification.model_json_schema()
 
 
-WRITER_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "branch": {"type": "string", "description": "Name of the git branch that was pushed"},
-        "pr_url": {"type": "string", "description": "URL of the opened pull request"},
-    },
-    "required": ["branch", "pr_url"],
-}
+_PULL_REQUEST_URL = re.compile(r"https://github\.com/[^/]+/[^/]+/pull/\d+/?")
+
+
+class WriterResult(BaseModel):
+    branch: str = Field(description="Name of the git branch that was pushed")
+    pr_url: str = Field(description="URL of the opened pull request")
+
+    # The checks below live in Python validators rather than in schema keywords
+    # (minLength/pattern) on purpose: the JSON schema handed to the agent stays
+    # exactly what it was, so no provider can reject a keyword it doesn't support.
+    @field_validator("branch")
+    @classmethod
+    def branch_is_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("branch must not be empty")
+        return value.strip()
+
+    @field_validator("pr_url")
+    @classmethod
+    def pr_url_points_to_a_pull_request(cls, value: str) -> str:
+        if not _PULL_REQUEST_URL.fullmatch(value.strip()):
+            raise ValueError(f"not a GitHub pull request URL: {value!r}")
+        return value.strip()
+
+
+WRITER_SCHEMA = WriterResult.model_json_schema()
 
 
 class Review(BaseModel):

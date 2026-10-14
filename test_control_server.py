@@ -121,6 +121,7 @@ def test_record_pr_merged_broadcasts_pr_merged_event(monkeypatch):
     assert captured["status"] == "success"
     assert captured["pr_url"] == "https://github.com/x/y/pull/1"
 
+
 def test_history_and_metrics_are_empty_not_500_without_database(monkeypatch):
     """With no DATABASE_URL the dashboard is live-only: the history endpoints
     answer 200 with empty data instead of failing."""

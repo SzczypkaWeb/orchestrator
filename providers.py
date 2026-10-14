@@ -62,7 +62,7 @@ def complete_with_gemini(prompt: str, schema: dict, model: str = "gemini-3.8-fla
         # class) - `response_mime_type` is required alongside it.
         config={"response_mime_type": "application/json", "response_json_schema": schema},
     )
-    if response.text is None: 
+    if response.text is None:
         raise RuntimeError(f"Gemini ({model}) returned no text - the response may have been blocked or empty")
     data = json.loads(response.text)
     usage = {

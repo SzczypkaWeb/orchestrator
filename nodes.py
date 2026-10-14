@@ -24,7 +24,7 @@ async def classify_task(state: GraphState) -> GraphState:
     prompt = f"""
 Classify the following development task by complexity:
 
-Task: {state['task']}
+Task: {state["task"]}
 
 - "simple_crud": a straightforward, repetitive CRUD-style change (e.g. add a
   standard REST endpoint, add a field, add basic validation, add pagination/
@@ -49,26 +49,48 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
                 result, usage = await asyncio.to_thread(complete, prompt, CLASSIFY_SCHEMA)
             complexity = result["complexity"]
             await record_metric(
-                run_id=state["run_id"], repo=state["repo"], node="classify_task",
-                provider=provider_name, model="default", duration_ms=t.duration_ms,
-                success=True, input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"),
+                run_id=state["run_id"],
+                repo=state["repo"],
+                node="classify_task",
+                provider=provider_name,
+                model="default",
+                duration_ms=t.duration_ms,
+                success=True,
+                input_tokens=usage.get("input_tokens"),
+                output_tokens=usage.get("output_tokens"),
             )
-            await broadcast({
-                "run_id": state["run_id"], "repo": state["repo"], "node": "classify_task",
-                "provider": provider_name, "status": "success",
-            })
+            await broadcast(
+                {
+                    "run_id": state["run_id"],
+                    "repo": state["repo"],
+                    "node": "classify_task",
+                    "provider": provider_name,
+                    "status": "success",
+                }
+            )
             break
         except Exception as e:
             print(f"[classify_task] {provider_name} failed ({e}), trying next provider...")
             await record_metric(
-                run_id=state["run_id"], repo=state["repo"], node="classify_task",
-                provider=provider_name, model="default", duration_ms=0,
-                success=False, error_message=str(e),
+                run_id=state["run_id"],
+                repo=state["repo"],
+                node="classify_task",
+                provider=provider_name,
+                model="default",
+                duration_ms=0,
+                success=False,
+                error_message=str(e),
             )
-            await broadcast({
-                "run_id": state["run_id"], "repo": state["repo"], "node": "classify_task",
-                "provider": provider_name, "status": "failed", "detail": str(e),
-            })
+            await broadcast(
+                {
+                    "run_id": state["run_id"],
+                    "repo": state["repo"],
+                    "node": "classify_task",
+                    "provider": provider_name,
+                    "status": "failed",
+                    "detail": str(e),
+                }
+            )
 
     if complexity is None:
         haiku_model = "claude-haiku-4-5"
@@ -85,18 +107,27 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
                     if not message.is_error and message.subtype == "success" and message.structured_output:
                         complexity = message.structured_output["complexity"]
                     await record_metric(
-                        run_id=state["run_id"], repo=state["repo"], node="classify_task",
-                        provider="claude", model=haiku_model,
-                        duration_ms=message.duration_ms, success=not message.is_error,
+                        run_id=state["run_id"],
+                        repo=state["repo"],
+                        node="classify_task",
+                        provider="claude",
+                        model=haiku_model,
+                        duration_ms=message.duration_ms,
+                        success=not message.is_error,
                         input_tokens=(message.usage or {}).get("input_tokens"),
                         output_tokens=(message.usage or {}).get("output_tokens"),
                         total_cost_usd=message.total_cost_usd,
                         error_message=message.result if message.is_error else None,
                     )
-                    await broadcast({
-                        "run_id": state["run_id"], "repo": state["repo"], "node": "classify_task",
-                        "provider": "claude", "status": "failed" if message.is_error else "success",
-                    })
+                    await broadcast(
+                        {
+                            "run_id": state["run_id"],
+                            "repo": state["repo"],
+                            "node": "classify_task",
+                            "provider": "claude",
+                            "status": "failed" if message.is_error else "success",
+                        }
+                    )
 
     model = "claude-haiku-4-5" if complexity == "simple_crud" else "claude-sonnet-5"
     return {**state, "writer_model": model}
@@ -121,7 +152,8 @@ def _target_branch_is_stale(repo_path: str, target_branch: str) -> str | None:
     )
     result = subprocess.run(
         ["git", "-C", repo_path, "log", f"origin/{target_branch}..origin/main", "--oneline"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     missing_commits = result.stdout.strip()
     if not missing_commits:
@@ -152,23 +184,19 @@ async def run_writer(state: GraphState) -> GraphState:
     #  4. Starting fresh - new branch, new PR.
     is_verify_retry = state.get("verify_attempts", 0) > 0 and not state.get("verify_passed", True)
     is_review_retry = state.get("review_attempts", 0) > 0
-    continue_branch = state.get("existing_branch") or (
-        state["branch"] if (is_verify_retry or is_review_retry) else ""
-    )
-    continue_pr_url = state.get("existing_pr_url") or (
-        state["pr_url"] if (is_verify_retry or is_review_retry) else ""
-    )
+    continue_branch = state.get("existing_branch") or (state["branch"] if (is_verify_retry or is_review_retry) else "")
+    continue_pr_url = state.get("existing_pr_url") or (state["pr_url"] if (is_verify_retry or is_review_retry) else "")
 
     if is_verify_retry:
         prompt = f"""
-You are working in a repo with this stack: {state['stack_description']}
-Original task: {state['task']}
+You are working in a repo with this stack: {state["stack_description"]}
+Original task: {state["task"]}
 
 Your own `pnpm lint` and/or `pnpm test` run on branch {continue_branch} (PR:
 {continue_pr_url}) actually failed - this is the real command output, not an
 opinion, so fix exactly what it reports:
 
-{state['verify_output']}
+{state["verify_output"]}
 
 Do the following steps in order:
 1. git fetch origin && git checkout {continue_branch} && git pull origin {continue_branch}.
@@ -186,14 +214,14 @@ pr_url: {continue_pr_url}
 """
     elif is_review_retry:
         prompt = f"""
-You are working in a repo with this stack: {state['stack_description']}
-Original task: {state['task']}
+You are working in a repo with this stack: {state["stack_description"]}
+Original task: {state["task"]}
 
 A code review of your previous changes on branch {continue_branch} (PR:
 {continue_pr_url}) requested changes. Address this feedback — do NOT start
 over or re-litigate the original task, just fix what's raised below:
 
-{state['review_notes']}
+{state["review_notes"]}
 
 Do the following steps in order:
 1. git fetch origin && git checkout {continue_branch} && git pull origin {continue_branch}.
@@ -212,8 +240,8 @@ pr_url: {continue_pr_url}
 """
     elif continue_branch:
         prompt = f"""
-You are working in a repo with this stack: {state['stack_description']}
-Task: {state['task']}
+You are working in a repo with this stack: {state["stack_description"]}
+Task: {state["task"]}
 
 You are CONTINUING work on an EXISTING branch and an already-open pull request —
 do NOT create a new branch and do NOT open a new PR.
@@ -244,23 +272,34 @@ pr_url: {continue_pr_url}
         stale_warning = _target_branch_is_stale(state["repo_path"], state["target_branch"])
         if stale_warning:
             await record_metric(
-                run_id=state["run_id"], repo=state["repo"], node="writer",
-                provider="local", model="git", duration_ms=0, success=False,
+                run_id=state["run_id"],
+                repo=state["repo"],
+                node="writer",
+                provider="local",
+                model="git",
+                duration_ms=0,
+                success=False,
                 error_message=stale_warning,
             )
-            await broadcast({
-                "run_id": state["run_id"], "repo": state["repo"], "node": "writer",
-                "provider": "local", "status": "blocked", "detail": stale_warning,
-            })
+            await broadcast(
+                {
+                    "run_id": state["run_id"],
+                    "repo": state["repo"],
+                    "node": "writer",
+                    "provider": "local",
+                    "status": "blocked",
+                    "detail": stale_warning,
+                }
+            )
             raise RuntimeError(f"Refusing to start new work on '{state['repo']}': {stale_warning}")
 
         prompt = f"""
-You are working in a repo with this stack: {state['stack_description']}
-Task: {state['task']}
+You are working in a repo with this stack: {state["stack_description"]}
+Task: {state["task"]}
 
 Do the following steps in order:
-1. git checkout {state['target_branch']} && git pull, then create a new branch with a
-   sensible name (feat/<something>) off of {state['target_branch']} - NOT off main,
+1. git checkout {state["target_branch"]} && git pull, then create a new branch with a
+   sensible name (feat/<something>) off of {state["target_branch"]} - NOT off main,
    unless target_branch is main.
 2. Write test(s) based directly on the task specification above, BEFORE writing any
    implementation. These tests describe the expected contract/behavior, independent
@@ -269,8 +308,8 @@ Do the following steps in order:
 4. Run the test suite, fix anything that fails (fix the implementation, not the
    test, unless a test was genuinely wrong given the spec).
 5. Commit your changes (conventional commits).
-6. Push the branch and open a PR against {state['target_branch']}:
-   gh pr create --base {state['target_branch']} --head <branch> --fill
+6. Push the branch and open a PR against {state["target_branch"]}:
+   gh pr create --base {state["target_branch"]} --head <branch> --fill
 7. Write all commit messages, the PR title/description, and any code comments in English.
 
 When you are finished, clearly state in your final answer: the exact name of
@@ -297,24 +336,31 @@ the branch you created, and the full URL of the pull request you opened.
                 # so a failed attempt's cost/duration matters at least as much
                 # as a successful one's.
                 await record_metric(
-                    run_id=state["run_id"], repo=state["repo"], node="writer",
-                    provider="claude", model=state["writer_model"],
-                    duration_ms=message.duration_ms, success=not message.is_error,
+                    run_id=state["run_id"],
+                    repo=state["repo"],
+                    node="writer",
+                    provider="claude",
+                    model=state["writer_model"],
+                    duration_ms=message.duration_ms,
+                    success=not message.is_error,
                     input_tokens=(message.usage or {}).get("input_tokens"),
                     output_tokens=(message.usage or {}).get("output_tokens"),
                     total_cost_usd=message.total_cost_usd,
                     error_message=message.result if message.is_error else None,
                 )
                 event_pr_url = (
-                    message.structured_output.get("pr_url")
-                    if (not message.is_error and message.structured_output)
-                    else None
+                    message.structured_output.get("pr_url") if (not message.is_error and message.structured_output) else None
                 )
-                await broadcast({
-                    "run_id": state["run_id"], "repo": state["repo"], "node": "writer",
-                    "provider": "claude", "status": "failed" if message.is_error else "success",
-                    "pr_url": event_pr_url,
-                })
+                await broadcast(
+                    {
+                        "run_id": state["run_id"],
+                        "repo": state["repo"],
+                        "node": "writer",
+                        "provider": "claude",
+                        "status": "failed" if message.is_error else "success",
+                        "pr_url": event_pr_url,
+                    }
+                )
                 if message.is_error:
                     if message.api_error_status in TRANSIENT_STATUS_CODES:
                         raise TransientError(f"{message.api_error_status}: {message.result}")
@@ -369,14 +415,24 @@ async def run_verification(state: GraphState) -> GraphState:
     # signal for the eventual dashboard (task #96): how much wall-clock time
     # verification adds per task, and how often it's the thing that blocks.
     await record_metric(
-        run_id=state["run_id"], repo=state["repo"], node="verify",
-        provider="local", model="pnpm", duration_ms=t.duration_ms, success=passed,
+        run_id=state["run_id"],
+        repo=state["repo"],
+        node="verify",
+        provider="local",
+        model="pnpm",
+        duration_ms=t.duration_ms,
+        success=passed,
         error_message=None if passed else output[:2000],
     )
-    await broadcast({
-        "run_id": state["run_id"], "repo": state["repo"], "node": "verify",
-        "provider": "local", "status": "success" if passed else "failed",
-    })
+    await broadcast(
+        {
+            "run_id": state["run_id"],
+            "repo": state["repo"],
+            "node": "verify",
+            "provider": "local",
+            "status": "success" if passed else "failed",
+        }
+    )
 
     verify_attempts = state.get("verify_attempts", 0) + (0 if passed else 1)
     return {**state, "verify_passed": passed, "verify_output": output, "verify_attempts": verify_attempts}
@@ -391,10 +447,10 @@ def route_after_verify(state: GraphState) -> Literal["proceed", "retry", "blocke
 
 
 def _build_review_prompt(state: GraphState, diff: str) -> str:
-    return f"""Review the following diff (branch {state['branch']} vs {state['target_branch']}) in a repo
-with this stack: {state['stack_description']}
+    return f"""Review the following diff (branch {state["branch"]} vs {state["target_branch"]}) in a repo
+with this stack: {state["stack_description"]}
 
-Check specifically for: {state['review_focus']}
+Check specifically for: {state["review_focus"]}
 
 Diff:
 {diff}
@@ -416,12 +472,14 @@ async def _review_with_gemini(state: GraphState) -> tuple[str, str]:
     # that the extra plumbing isn't worth it, even though lead.py may run
     # several of these concurrently across repos.
     diff = await asyncio.to_thread(
-        lambda: subprocess.run(
-            ["git", "-C", state["repo_path"], "diff", f"{state['target_branch']}...{state['branch']}"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
+        lambda: (
+            subprocess.run(
+                ["git", "-C", state["repo_path"], "diff", f"{state['target_branch']}...{state['branch']}"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+        )
     )
     if not diff.strip():
         raise RuntimeError(f"Empty diff for branch {state['branch']} vs {state['target_branch']} - nothing to review")
@@ -431,23 +489,47 @@ async def _review_with_gemini(state: GraphState) -> tuple[str, str]:
             result, usage = await asyncio.to_thread(complete_with_gemini, _build_review_prompt(state, diff), REVIEW_SCHEMA)
     except Exception as e:
         await record_metric(
-            run_id=state["run_id"], repo=state["repo"], node="security_review",
-            provider="gemini", model="default", duration_ms=0, success=False, error_message=str(e),
+            run_id=state["run_id"],
+            repo=state["repo"],
+            node="security_review",
+            provider="gemini",
+            model="default",
+            duration_ms=0,
+            success=False,
+            error_message=str(e),
         )
-        await broadcast({
-            "run_id": state["run_id"], "repo": state["repo"], "node": "security_review",
-            "provider": "gemini", "status": "failed", "detail": str(e),
-        })
+        await broadcast(
+            {
+                "run_id": state["run_id"],
+                "repo": state["repo"],
+                "node": "security_review",
+                "provider": "gemini",
+                "status": "failed",
+                "detail": str(e),
+            }
+        )
         raise
     await record_metric(
-        run_id=state["run_id"], repo=state["repo"], node="security_review",
-        provider="gemini", model="default", duration_ms=t.duration_ms, success=True,
-        input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"),
+        run_id=state["run_id"],
+        repo=state["repo"],
+        node="security_review",
+        provider="gemini",
+        model="default",
+        duration_ms=t.duration_ms,
+        success=True,
+        input_tokens=usage.get("input_tokens"),
+        output_tokens=usage.get("output_tokens"),
     )
-    await broadcast({
-        "run_id": state["run_id"], "repo": state["repo"], "node": "security_review",
-        "provider": "gemini", "status": "success", "detail": result["verdict"],
-    })
+    await broadcast(
+        {
+            "run_id": state["run_id"],
+            "repo": state["repo"],
+            "node": "security_review",
+            "provider": "gemini",
+            "status": "success",
+            "detail": result["verdict"],
+        }
+    )
     return result["verdict"], result["notes"]
 
 
@@ -456,10 +538,10 @@ async def _review_with_claude(state: GraphState) -> tuple[str, str]:
     # review (can run `git diff`/read files itself) for when Gemini is
     # unavailable or misconfigured.
     prompt = f"""
-Review the changes on branch {state['branch']} in this repo
-(e.g. `git diff {state['target_branch']}...{state['branch']}`). Stack: {state['stack_description']}
+Review the changes on branch {state["branch"]} in this repo
+(e.g. `git diff {state["target_branch"]}...{state["branch"]}`). Stack: {state["stack_description"]}
 
-Check specifically for: {state['review_focus']}
+Check specifically for: {state["review_focus"]}
 
 Based on your review, decide on a verdict: "approved" if you find no
 significant issues, or "changes_requested" if you find problems that
@@ -484,18 +566,27 @@ explaining the reasoning behind your verdict.
         ):
             if isinstance(message, ResultMessage):
                 await record_metric(
-                    run_id=state["run_id"], repo=state["repo"], node="security_review",
-                    provider="claude", model=fallback_model,
-                    duration_ms=message.duration_ms, success=not message.is_error,
+                    run_id=state["run_id"],
+                    repo=state["repo"],
+                    node="security_review",
+                    provider="claude",
+                    model=fallback_model,
+                    duration_ms=message.duration_ms,
+                    success=not message.is_error,
                     input_tokens=(message.usage or {}).get("input_tokens"),
                     output_tokens=(message.usage or {}).get("output_tokens"),
                     total_cost_usd=message.total_cost_usd,
                     error_message=message.result if message.is_error else None,
                 )
-                await broadcast({
-                    "run_id": state["run_id"], "repo": state["repo"], "node": "security_review",
-                    "provider": "claude", "status": "failed" if message.is_error else "success",
-                })
+                await broadcast(
+                    {
+                        "run_id": state["run_id"],
+                        "repo": state["repo"],
+                        "node": "security_review",
+                        "provider": "claude",
+                        "status": "failed" if message.is_error else "success",
+                    }
+                )
                 if message.is_error:
                     if message.api_error_status in TRANSIENT_STATUS_CODES:
                         raise TransientError(f"{message.api_error_status}: {message.result}")

@@ -20,12 +20,8 @@ def state() -> GraphState:
         (False, 2, "blocked"),
     ],
 )
-def test_route_after_verify(
-    state: GraphState, verify_passed: bool, verify_attempts: int, expected: str
-):
-    result = route_after_verify(
-        {**state, "verify_passed": verify_passed, "verify_attempts": verify_attempts}
-    )
+def test_route_after_verify(state: GraphState, verify_passed: bool, verify_attempts: int, expected: str):
+    result = route_after_verify({**state, "verify_passed": verify_passed, "verify_attempts": verify_attempts})
 
     assert result == expected
 
@@ -40,11 +36,7 @@ def test_route_after_verify(
         ("changes_requested", 2, "blocked"),
     ],
 )
-def test_route_after_review(
-    state: GraphState, review_verdict: str, review_attempts: int, expected: str
-):
-    result = route_after_review(
-        {**state, "review_verdict": review_verdict, "review_attempts": review_attempts}
-    )
+def test_route_after_review(state: GraphState, review_verdict: str, review_attempts: int, expected: str):
+    result = route_after_review({**state, "review_verdict": review_verdict, "review_attempts": review_attempts})
 
     assert result == expected

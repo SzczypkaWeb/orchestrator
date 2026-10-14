@@ -14,7 +14,12 @@ async def fetch_pr_status(pr_url: str) -> str:
     that looks like a valid status.
     """
     proc = await asyncio.create_subprocess_exec(
-        "gh", "pr", "view", pr_url, "--json", "state",
+        "gh",
+        "pr",
+        "view",
+        pr_url,
+        "--json",
+        "state",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

@@ -39,9 +39,7 @@ def _text(name: str, key: str, value: object) -> str:
             raise ConfigError(f"repos.{name}.{key}: list items must all be strings")
         value = " ".join(v.strip() for v in value)
     if not isinstance(value, str) or not value.strip():
-        raise ConfigError(
-            f"repos.{name}.{key}: must be a non-empty string (or a list of strings)"
-        )
+        raise ConfigError(f"repos.{name}.{key}: must be a non-empty string (or a list of strings)")
     return value.strip()
 
 
@@ -63,9 +61,7 @@ def load_repos(path: Path | None = None) -> dict[str, dict]:
 
     repos = data.get("repos") if isinstance(data, dict) else None
     if not isinstance(repos, dict) or not repos:
-        raise ConfigError(
-            f"{cfg_file}: expected a top-level `repos:` mapping with at least one repo"
-        )
+        raise ConfigError(f"{cfg_file}: expected a top-level `repos:` mapping with at least one repo")
 
     result: dict[str, dict] = {}
     for name, entry in repos.items():
@@ -73,14 +69,10 @@ def load_repos(path: Path | None = None) -> dict[str, dict]:
             raise ConfigError(f"repos.{name}: must be a mapping")
         missing = [k for k in _REQUIRED_KEYS if k not in entry]
         if missing:
-            raise ConfigError(
-                f"repos.{name}: missing required key(s): {', '.join(missing)}"
-            )
+            raise ConfigError(f"repos.{name}: missing required key(s): {', '.join(missing)}")
         unknown = sorted(set(entry) - _ALLOWED_KEYS)
         if unknown:
-            raise ConfigError(
-                f"repos.{name}: unknown key(s): {', '.join(unknown)} (allowed: {', '.join(sorted(_ALLOWED_KEYS))})"
-            )
+            raise ConfigError(f"repos.{name}: unknown key(s): {', '.join(unknown)} (allowed: {', '.join(sorted(_ALLOWED_KEYS))})")
 
         raw_path = entry["path"]
         if not isinstance(raw_path, str) or not raw_path.strip():
@@ -95,9 +87,7 @@ def load_repos(path: Path | None = None) -> dict[str, dict]:
 
         result[str(name)] = {
             "path": str(repo_path.resolve()),
-            "stack_description": _text(
-                name, "stack_description", entry["stack_description"]
-            ),
+            "stack_description": _text(name, "stack_description", entry["stack_description"]),
             "review_focus": _text(name, "review_focus", entry["review_focus"]),
             "target_branch": branch.strip(),
         }
@@ -123,9 +113,7 @@ def detect_repo_from_cwd() -> str | None:
     return None
 
 
-def initial_state_for(
-    repo_name: str, task_text: str, existing_branch: str = "", existing_pr_url: str = ""
-) -> GraphState:
+def initial_state_for(repo_name: str, task_text: str, existing_branch: str = "", existing_pr_url: str = "") -> GraphState:
     cfg = REPOS[repo_name]
     return {
         "task": task_text,

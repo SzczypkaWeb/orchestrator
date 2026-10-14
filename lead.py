@@ -25,6 +25,7 @@ LEAD_SCHEMA = {
     "required": ["subtasks"],
 }
 
+
 async def split_task(high_level_task: str) -> list[dict]:
     prompt = f"""
 You are a technical lead splitting a cross-cutting engineering request into
@@ -65,6 +66,7 @@ follow without seeing the other repos. If a repo needs no change, omit it.
 
     return await with_retry(attempt)
 
+
 async def run_lead(high_level_task: str) -> None:
     subtasks = await split_task(high_level_task)
     if not subtasks:
@@ -83,10 +85,16 @@ async def run_lead(high_level_task: str) -> None:
     states = []
     for st in subtasks:
         state = initial_state_for(st["repo"], st["task"])
-        await broadcast({
-            "run_id": state["run_id"], "repo": state["repo"], "node": "trigger",
-            "provider": "user", "status": "success", "detail": st["task"],
-        })
+        await broadcast(
+            {
+                "run_id": state["run_id"],
+                "repo": state["repo"],
+                "node": "trigger",
+                "provider": "user",
+                "status": "success",
+                "detail": st["task"],
+            }
+        )
         states.append(state)
 
     results = await asyncio.gather(
@@ -106,12 +114,19 @@ async def run_lead(high_level_task: str) -> None:
             print(f"  Verdict: {result['review_verdict']}")
             print(f"  Notes: {result['review_notes']}")
 
+
 async def run_single(repo: str, task: str) -> None:
     state = initial_state_for(repo, task)
-    await broadcast({
-        "run_id": state["run_id"], "repo": state["repo"], "node": "trigger",
-        "provider": "user", "status": "success", "detail": task,
-    })
+    await broadcast(
+        {
+            "run_id": state["run_id"],
+            "repo": state["repo"],
+            "node": "trigger",
+            "provider": "user",
+            "status": "success",
+            "detail": task,
+        }
+    )
     result = await compiled.ainvoke(state)
     print(f"[{repo}] Branch: {result['branch']}")
     print(f"  PR: {result['pr_url']}")

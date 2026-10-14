@@ -92,9 +92,7 @@ def test_complete_run_broadcasts_manually_completed_event(monkeypatch):
     monkeypatch.setattr(control_server, "broadcast", fake_broadcast)
 
     client = TestClient(control_server.app)
-    response = client.post(
-        "/runs/complete", json={"run_id": "abc123", "repo": "backend"}
-    )
+    response = client.post("/runs/complete", json={"run_id": "abc123", "repo": "backend"})
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}

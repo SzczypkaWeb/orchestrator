@@ -38,11 +38,7 @@ async def trigger_run(request: TriggerRequest):
     if request.repo is not None and request.repo not in REPOS:
         raise HTTPException(status_code=400, detail=f"Unknown repo: {request.repo}")
 
-    coro = (
-        run_single(request.repo, request.task)
-        if request.repo
-        else run_lead(request.task)
-    )
+    coro = run_single(request.repo, request.task) if request.repo else run_lead(request.task)
     task = asyncio.create_task(coro)
     running_runs.add(task)
     task.add_done_callback(running_runs.discard)

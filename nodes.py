@@ -394,7 +394,8 @@ the branch you created, and the full URL of the pull request you opened.
                 if result is None:
                     raise RuntimeError(f"Writer agent did not return valid structured output: {message.subtype}")
         if result is None:
-            raise TransientError("Writer agent finished without a result message")
+            # Not retried, for the same duplicate-PR reason as an invalid result.
+            raise RuntimeError("Writer agent finished without a result message")
         return result
 
     result = await with_retry(attempt)

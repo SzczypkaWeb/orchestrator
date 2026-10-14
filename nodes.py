@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from events import broadcast
 from providers import complete_with_gemini, complete_with_groq
 from retry import TRANSIENT_STATUS_CODES, TransientError, with_retry
-from schemas import CLASSIFY_SCHEMA, REVIEW_SCHEMA, WRITER_SCHEMA, Classification, Review
+from schemas import CLASSIFY_SCHEMA, REVIEW_SCHEMA, WRITER_SCHEMA, Classification, Review, WriterResult
 from state import GraphState
 from telemetry import Timer, record_metric
 
@@ -329,8 +329,8 @@ When you are finished, clearly state in your final answer: the exact name of
 the branch you created, and the full URL of the pull request you opened.
 """
 
-    async def attempt():
-        branch, pr_url = "", ""
+    async def attempt() -> WriterResult:
+        result: WriterResult | None = None
         async for message in query(
             prompt=prompt,
             options=ClaudeAgentOptions(
@@ -361,34 +361,44 @@ the branch you created, and the full URL of the pull request you opened.
                     total_cost_usd=message.total_cost_usd,
                     error_message=message.result if message.is_error else None,
                 )
-                event_pr_url = (
-                    message.structured_output.get("pr_url") if (not message.is_error and message.structured_output) else None
-                )
+                # Validated before the broadcast, so the dashboard only ever gets
+                # a pr_url that is a real pull request link, and an invalid
+                # result shows up there as a failed writer step.
+                invalid: ValidationError | None = None
+                if not message.is_error and message.structured_output:
+                    try:
+                        result = WriterResult.model_validate(message.structured_output)
+                    except ValidationError as e:
+                        invalid = e
                 await broadcast(
                     {
                         "run_id": state["run_id"],
                         "repo": state["repo"],
                         "node": "writer",
                         "provider": "claude",
-                        "status": "failed" if message.is_error else "success",
-                        "pr_url": event_pr_url,
+                        "status": "failed" if (message.is_error or invalid) else "success",
+                        "pr_url": result.pr_url if result else None,
                     }
                 )
                 if message.is_error:
                     if message.api_error_status in TRANSIENT_STATUS_CODES:
                         raise TransientError(f"{message.api_error_status}: {message.result}")
                     raise RuntimeError(f"Agent run failed ({message.api_error_status}): {message.result}")
-                if message.subtype == "success" and message.structured_output:
-                    branch = message.structured_output["branch"]
-                    pr_url = message.structured_output["pr_url"]
-                elif message.subtype == "success":
+                if invalid is not None:
+                    # Deliberately NOT a TransientError: by now the agent has most
+                    # likely pushed a branch and opened a PR, so a retry would run the
+                    # whole task again and open a duplicate. Fail loudly instead.
+                    raise RuntimeError(f"Writer agent returned an invalid result: {invalid}") from invalid
+                if result is None and message.subtype == "success":
                     raise TransientError("Writer agent completed without calling structured output")
-                else:
+                if result is None:
                     raise RuntimeError(f"Writer agent did not return valid structured output: {message.subtype}")
-        return branch, pr_url
+        if result is None:
+            raise TransientError("Writer agent finished without a result message")
+        return result
 
-    branch, pr_url = await with_retry(attempt)
-    return {**state, "branch": branch, "pr_url": pr_url}
+    result = await with_retry(attempt)
+    return {**state, "branch": result.branch, "pr_url": result.pr_url}
 
 
 MAX_VERIFY_ATTEMPTS = 2

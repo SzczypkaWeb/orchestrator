@@ -1,3 +1,6 @@
+import asyncio
+
+import pytest
 from fastapi.testclient import TestClient
 
 import control_server
@@ -89,7 +92,9 @@ def test_complete_run_broadcasts_manually_completed_event(monkeypatch):
     monkeypatch.setattr(control_server, "broadcast", fake_broadcast)
 
     client = TestClient(control_server.app)
-    response = client.post("/runs/complete", json={"run_id": "abc123", "repo": "backend"})
+    response = client.post(
+        "/runs/complete", json={"run_id": "abc123", "repo": "backend"}
+    )
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -110,7 +115,11 @@ def test_record_pr_merged_broadcasts_pr_merged_event(monkeypatch):
     client = TestClient(control_server.app)
     response = client.post(
         "/runs/pr-merged",
-        json={"run_id": "abc123", "repo": "backend", "pr_url": "https://github.com/x/y/pull/1"},
+        json={
+            "run_id": "abc123",
+            "repo": "backend",
+            "pr_url": "https://github.com/x/y/pull/1",
+        },
     )
 
     assert response.status_code == 200
@@ -139,3 +148,13 @@ def test_history_and_metrics_are_empty_not_500_without_database(monkeypatch):
     metrics = client.get("/runs/abc123/metrics")
     assert metrics.status_code == 200
     assert metrics.json() == {"metrics": []}
+
+
+async def test_handle_run_result_ignores_cancelled_task():
+    task = asyncio.create_task(asyncio.sleep(10))
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    control_server.handle_run_result(task)

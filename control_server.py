@@ -30,20 +30,33 @@ class TriggerRequest(BaseModel):
     repo: str | None = None
 
 
+running_runs: set[asyncio.Task[None]] = set()
+
+
 @app.post("/runs")
 async def trigger_run(request: TriggerRequest):
     if request.repo is not None and request.repo not in REPOS:
         raise HTTPException(status_code=400, detail=f"Unknown repo: {request.repo}")
 
-    coro = run_single(request.repo, request.task) if request.repo else run_lead(request.task)
+    coro = (
+        run_single(request.repo, request.task)
+        if request.repo
+        else run_lead(request.task)
+    )
     task = asyncio.create_task(coro)
+    running_runs.add(task)
+    task.add_done_callback(running_runs.discard)
     task.add_done_callback(handle_run_result)
     return {"status": "started", "task": request.task, "repo": request.repo}
 
 
-def handle_run_result(task: asyncio.Task):
-    if task.exception():
-        print(f"Run failed: {task.exception()}")
+def handle_run_result(task: asyncio.Task[None]) -> None:
+    if task.cancelled():
+        return
+    error = task.exception()
+
+    if error is not None:
+        print(f"Run Failed: {error}")
 
 
 @app.get("/ping")

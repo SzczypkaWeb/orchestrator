@@ -24,7 +24,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "ruff>=0.16.10",
+    "ruff>=0.17.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     # fastapi.testclient.TestClient (test_control_server.py) needs httpx.

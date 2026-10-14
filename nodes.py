@@ -146,10 +146,15 @@ def _target_branch_is_stale(repo_path: str, target_branch: str) -> str | None:
     work already merged there) is the normal, expected state, not staleness."""
     if target_branch == "main":
         return None
-    subprocess.run(
+    fetch = subprocess.run(
         ["git", "-C", repo_path, "fetch", "origin", "main", target_branch],
         capture_output=True,
+        text=True,
     )
+
+    if fetch.returncode != 0:
+        raise RuntimeError(f"git fetch failed in {repo_path}: {fetch.stderr.strip()}")
+
     result = subprocess.run(
         ["git", "-C", repo_path, "log", f"origin/{target_branch}..origin/main", "--oneline"],
         capture_output=True,
@@ -269,7 +274,7 @@ pr_url: {continue_pr_url}
         # any Claude tokens, not after. Not applicable to the three branches
         # above (verify-retry/review-retry/continue) since those work on a
         # branch that already exists, not one about to be cut from target_branch.
-        stale_warning = _target_branch_is_stale(state["repo_path"], state["target_branch"])
+        stale_warning = await asyncio.to_thread(_target_branch_is_stale, state["repo_path"], state["target_branch"])
         if stale_warning:
             await record_metric(
                 run_id=state["run_id"],

@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from events import broadcast, connected
+from events import broadcast, connected, disconnect
 from github import fetch_pr_status
 from lead import run_lead, run_single
 from repos import REPOS
@@ -24,57 +24,74 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class TriggerRequest(BaseModel):
     task: str
     repo: str | None = None
+
 
 @app.post("/runs")
 async def trigger_run(request: TriggerRequest):
     if request.repo is not None and request.repo not in REPOS:
         raise HTTPException(status_code=400, detail=f"Unknown repo: {request.repo}")
 
-    coro = run_single(request.repo, request.task) if request.repo else run_lead(request.task)
+    coro = (
+        run_single(request.repo, request.task)
+        if request.repo
+        else run_lead(request.task)
+    )
     task = asyncio.create_task(coro)
     task.add_done_callback(handle_run_result)
     return {"status": "started", "task": request.task, "repo": request.repo}
+
 
 def handle_run_result(task: asyncio.Task):
     if task.exception():
         print(f"Run failed: {task.exception()}")
 
+
 @app.get("/ping")
 def ping():
     return {"status": "ok"}
 
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    connected.append(websocket)
+    connected.add(websocket)
     try:
         while True:
-            await websocket.receive_text()  # tylko żeby wykryć rozłączenie
+            await websocket.receive_text()  # only used to detect disconnect
     except WebSocketDisconnect:
-        connected.remove(websocket)
+        pass
+    finally:
+        disconnect(websocket)
+
 
 @app.get("/repos")
 def list_repos():
     return {"repos": list(REPOS.keys())}
 
+
 @app.get("/runs")
 async def list_run_history():
     return {"events": await fetch_run_events()}
+
 
 @app.get("/runs/{run_id}/metrics")
 async def get_run_metrics(run_id: str):
     return {"metrics": await fetch_run_metrics(run_id)}
 
+
 @app.get("/pr-status")
 async def get_pr_status(url: str):
     return {"status": await fetch_pr_status(url)}
 
+
 class CompleteRunRequest(BaseModel):
     run_id: str
     repo: str
+
 
 @app.post("/runs/complete")
 async def complete_run(request: CompleteRunRequest):
@@ -85,20 +102,24 @@ async def complete_run(request: CompleteRunRequest):
     persisted via save_run_event same as any other node, survives a
     refresh, and is visible from any connected dashboard, not just the one
     that clicked the button."""
-    await broadcast({
-        "run_id": request.run_id,
-        "repo": request.repo,
-        "node": "manually_completed",
-        "provider": "user",
-        "status": "success",
-        "detail": "Manually marked as done",
-    })
+    await broadcast(
+        {
+            "run_id": request.run_id,
+            "repo": request.repo,
+            "node": "manually_completed",
+            "provider": "user",
+            "status": "success",
+            "detail": "Manually marked as done",
+        }
+    )
     return {"status": "ok"}
+
 
 class PrMergedRequest(BaseModel):
     run_id: str
     repo: str
     pr_url: str
+
 
 @app.post("/runs/pr-merged")
 async def record_pr_merged(request: PrMergedRequest):
@@ -111,13 +132,15 @@ async def record_pr_merged(request: PrMergedRequest):
     that into a one-time flash, ever, per run. Same broadcast()/save_run_event
     pipeline as every other node, so it's visible to any connected dashboard
     and survives a restart."""
-    await broadcast({
-        "run_id": request.run_id,
-        "repo": request.repo,
-        "node": "pr_merged",
-        "provider": "github",
-        "status": "success",
-        "detail": "PR merged",
-        "pr_url": request.pr_url,
-    })
+    await broadcast(
+        {
+            "run_id": request.run_id,
+            "repo": request.repo,
+            "node": "pr_merged",
+            "provider": "github",
+            "status": "success",
+            "detail": "PR merged",
+            "pr_url": request.pr_url,
+        }
+    )
     return {"status": "ok"}

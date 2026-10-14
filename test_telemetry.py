@@ -34,8 +34,8 @@ async def test_save_run_event_inserts_expected_row(monkeypatch):
     assert 'INSERT INTO "RunEvent"' in sql
     assert "abc123" in params
     assert "https://github.com/x/pull/1" in params
-    
-    
+
+
 async def test_fetch_run_events_maps_columns(monkeypatch):
     created_at = datetime(2026, 9, 16, 12, 0, 0, tzinfo=timezone.utc)
     fake_rows = [
@@ -76,6 +76,7 @@ async def test_fetch_run_events_maps_columns(monkeypatch):
             "created_at": created_at.isoformat(),
         }
     ]
+
 
 # --- optional persistence: behavior without / with a broken DATABASE_URL -----
 
@@ -149,8 +150,19 @@ SCHEMA_SQL = Path(__file__).parent / "schema.sql"
 # schema in the sibling backend project, if you share its database).
 EXPECTED_COLUMNS = {
     "ExecutionMetric": {
-        "id", "runId", "repo", "node", "provider", "model", "inputTokens", "outputTokens",
-        "totalCostUsd", "durationMs", "success", "errorMessage", "createdAt",
+        "id",
+        "runId",
+        "repo",
+        "node",
+        "provider",
+        "model",
+        "inputTokens",
+        "outputTokens",
+        "totalCostUsd",
+        "durationMs",
+        "success",
+        "errorMessage",
+        "createdAt",
     },
     "RunEvent": {"id", "runId", "repo", "node", "provider", "status", "detail", "prUrl", "createdAt"},
 }

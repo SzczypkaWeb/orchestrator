@@ -83,6 +83,7 @@ async def fetch_run_events() -> list[dict]:
         for row in rows
     ]
 
+
 async def fetch_run_metrics(run_id: str) -> list[dict]:
     """All ExecutionMetric rows for one run, oldest first - the token/cost/
     duration telemetry `record_metric` (below) already writes on every
@@ -125,6 +126,7 @@ async def fetch_run_metrics(run_id: str) -> list[dict]:
         for row in rows
     ]
 
+
 async def save_run_event(
     *,
     run_id: str,
@@ -161,7 +163,7 @@ async def save_run_event(
             )
     except Exception as e:
         print(f"[runEvent] failed to save run event ({node}/{provider}): {e}")
-        
+
 
 async def record_metric(
     *,

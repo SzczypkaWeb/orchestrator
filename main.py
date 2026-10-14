@@ -23,10 +23,7 @@ def parse_args():
     )
     parser.add_argument(
         "--branch",
-        help=(
-            "Continue an existing branch/PR instead of starting a new one "
-            "(requires --pr-url; not compatible with --lead)"
-        ),
+        help=("Continue an existing branch/PR instead of starting a new one (requires --pr-url; not compatible with --lead)"),
     )
     parser.add_argument("--pr-url", help="URL of the existing PR being fixed (used together with --branch)")
     group = parser.add_mutually_exclusive_group(required=True)

@@ -8,9 +8,7 @@ class TransientError(Exception):
     """Raised for retryable API errors (rate limits, overload, transient server errors)."""
 
 
-async def with_retry[T](
-    fn: Callable[[], Awaitable[T]], max_attempts: int = 3, base_delay: float = 2.0
-) -> T:
+async def with_retry[T](fn: Callable[[], Awaitable[T]], max_attempts: int = 3, base_delay: float = 2.0) -> T:
     """Retries an async fn() on TransientError, with exponential backoff.
     Any other exception (e.g. RuntimeError for permanent failures) propagates immediately."""
 
@@ -22,13 +20,9 @@ async def with_retry[T](
             return await fn()
         except TransientError as e:
             if attempt == max_attempts:
-                raise RuntimeError(
-                    f"Failed after {max_attempts} attempts (last error: {e})"
-                ) from e
+                raise RuntimeError(f"Failed after {max_attempts} attempts (last error: {e})") from e
             delay = base_delay * (2 ** (attempt - 1))
-            print(
-                f"Transient error (attempt {attempt}/{max_attempts}): {e}. Retrying in {delay:.0f}s..."
-            )
+            print(f"Transient error (attempt {attempt}/{max_attempts}): {e}. Retrying in {delay:.0f}s...")
             await asyncio.sleep(delay)
-            
+
     raise AssertionError("unreachable: the loop always returns or raises")

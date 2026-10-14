@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from events import broadcast
 from providers import complete_with_gemini, complete_with_groq
 from retry import TRANSIENT_STATUS_CODES, TransientError, with_retry
-from schemas import CLASSIFY_SCHEMA, REVIEW_SCHEMA, WRITER_SCHEMA, Classification
+from schemas import CLASSIFY_SCHEMA, REVIEW_SCHEMA, WRITER_SCHEMA, Classification, Review
 from state import GraphState
 from telemetry import Timer, record_metric
 
@@ -477,7 +477,7 @@ Respond with JSON matching this schema: {REVIEW_SCHEMA}
 """
 
 
-async def _review_with_gemini(state: GraphState) -> tuple[str, str]:
+async def _review_with_gemini(state: GraphState) -> Review:
     # Plain text-completion review (no agentic tool use - Gemini here isn't
     # browsing the repo itself), so the diff has to be fetched and handed to
     # it directly. Deliberately synchronous subprocess call wrapped in
@@ -500,6 +500,10 @@ async def _review_with_gemini(state: GraphState) -> tuple[str, str]:
     try:
         with Timer() as t:
             result, usage = await asyncio.to_thread(complete_with_gemini, _build_review_prompt(state, diff), REVIEW_SCHEMA)
+        # Inside the try on purpose: an answer that doesn't match Review is
+        # recorded as a failed Gemini call like any other error, and the raise
+        # below sends run_security_review to the Claude fallback.
+        review = Review.model_validate(result)
     except Exception as e:
         await record_metric(
             run_id=state["run_id"],
@@ -540,13 +544,13 @@ async def _review_with_gemini(state: GraphState) -> tuple[str, str]:
             "node": "security_review",
             "provider": "gemini",
             "status": "success",
-            "detail": result["verdict"],
+            "detail": review.verdict,
         }
     )
-    return result["verdict"], result["notes"]
+    return review
 
 
-async def _review_with_claude(state: GraphState) -> tuple[str, str]:
+async def _review_with_claude(state: GraphState) -> Review:
     # Original implementation, kept as the fallback: a real agentic Claude
     # review (can run `git diff`/read files itself) for when Gemini is
     # unavailable or misconfigured.
@@ -564,8 +568,8 @@ explaining the reasoning behind your verdict.
 
     fallback_model = "claude-haiku-4-5"
 
-    async def attempt():
-        verdict, notes = "", ""
+    async def attempt() -> Review:
+        review: Review | None = None
         async for message in query(
             prompt=prompt,
             options=ClaudeAgentOptions(
@@ -605,26 +609,33 @@ explaining the reasoning behind your verdict.
                         raise TransientError(f"{message.api_error_status}: {message.result}")
                     raise RuntimeError(f"Agent run failed ({message.api_error_status}): {message.result}")
                 if message.subtype == "success" and message.structured_output:
-                    verdict = message.structured_output["verdict"]
-                    notes = message.structured_output["notes"]
+                    try:
+                        review = Review.model_validate(message.structured_output)
+                    except ValidationError as e:
+                        # Same treatment as a missing structured output: retry. Unlike
+                        # classify_task there is no safe default to fall back to - an
+                        # invented "approved" would wave unreviewed code through.
+                        raise TransientError(f"Security review agent returned an invalid review: {e}") from e
                 elif message.subtype == "success":
                     raise TransientError("Security review agent completed without calling structured output")
                 else:
                     raise RuntimeError(f"Security review agent did not return valid structured output: {message.subtype}")
-        return verdict, notes
+        if review is None:
+            raise TransientError("Security review agent finished without a result message")
+        return review
 
     return await with_retry(attempt)
 
 
 async def run_security_review(state: GraphState) -> GraphState:
     try:
-        verdict, notes = await _review_with_gemini(state)
+        review = await _review_with_gemini(state)
     except Exception as e:
         print(f"[run_security_review] Gemini review failed ({e}), falling back to Claude...")
-        verdict, notes = await _review_with_claude(state)
+        review = await _review_with_claude(state)
 
-    review_attempts = state.get("review_attempts", 0) + (1 if verdict == "changes_requested" else 0)
-    return {**state, "review_verdict": verdict, "review_notes": notes, "review_attempts": review_attempts}
+    review_attempts = state.get("review_attempts", 0) + (1 if review.verdict == "changes_requested" else 0)
+    return {**state, "review_verdict": review.verdict, "review_notes": review.notes, "review_attempts": review_attempts}
 
 
 def route_after_review(state: GraphState) -> Literal["done", "retry", "blocked"]:

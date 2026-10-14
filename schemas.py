@@ -4,7 +4,7 @@
 # LLM actually returned, and the JSON schema handed to the provider.
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Classification(BaseModel):
@@ -29,11 +29,14 @@ WRITER_SCHEMA = {
     "required": ["branch", "pr_url"],
 }
 
-REVIEW_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "verdict": {"type": "string", "enum": ["approved", "changes_requested"]},
-        "notes": {"type": "string", "description": "Explanation for the verdict"},
-    },
-    "required": ["verdict", "notes"],
-}
+
+class Review(BaseModel):
+    # No extra="forbid" here, unlike Classification: this schema only goes to
+    # Gemini and the Claude Agent SDK (never Groq), and the hand-written dict
+    # it replaces never had additionalProperties:false either - keeping the
+    # schema the providers see unchanged apart from Pydantic's "title" keys.
+    verdict: Literal["approved", "changes_requested"]
+    notes: str = Field(description="Explanation for the verdict")
+
+
+REVIEW_SCHEMA = Review.model_json_schema()

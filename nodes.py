@@ -3,11 +3,12 @@ import subprocess
 from typing import Literal
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+from pydantic import ValidationError
 
 from events import broadcast
 from providers import complete_with_gemini, complete_with_groq
 from retry import TRANSIENT_STATUS_CODES, TransientError, with_retry
-from schemas import CLASSIFY_SCHEMA, REVIEW_SCHEMA, WRITER_SCHEMA
+from schemas import CLASSIFY_SCHEMA, REVIEW_SCHEMA, WRITER_SCHEMA, Classification
 from state import GraphState
 from telemetry import Timer, record_metric
 
@@ -47,7 +48,7 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
         try:
             with Timer() as t:
                 result, usage = await asyncio.to_thread(complete, prompt, CLASSIFY_SCHEMA)
-            complexity = result["complexity"]
+            complexity = Classification.model_validate(result).complexity
             await record_metric(
                 run_id=state["run_id"],
                 repo=state["repo"],
@@ -105,7 +106,14 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
             ):
                 if isinstance(message, ResultMessage):
                     if not message.is_error and message.subtype == "success" and message.structured_output:
-                        complexity = message.structured_output["complexity"]
+                        try:
+                            complexity = Classification.model_validate(message.structured_output).complexity
+                        except ValidationError as e:
+                            # Last provider in the chain, so an invalid answer must not fail
+                            # the whole run: leaving complexity as None falls through to the
+                            # stronger writer model below - same "when in doubt, novel" rule
+                            # the prompt itself states.
+                            print(f"[classify_task] claude returned an invalid classification ({e}), defaulting to novel")
                     await record_metric(
                         run_id=state["run_id"],
                         repo=state["repo"],

@@ -27,6 +27,7 @@ dashboard (`dashboard/`, see its own conventions in
 - `lead.py` — splits cross-repo tasks into per-repo subtasks, dispatches in parallel.
 - `main.py` — CLI entry point.
 - `retry.py` — retry helper for transient provider errors.
+- `logging_setup.py` — `configure_logging()` (called once by `main.py` and `control_server.py`) and `current_run_id`, which tags every log line with its run. Modules use `logging.getLogger(__name__)`, never `print()` (only `main.py`'s final summary is printed, as CLI output).
 - `github.py` — PR status via `gh` subprocess.
 - `telemetry.py` — per-call cost/token logging straight to backend's Postgres.
 - `control_server.py` — FastAPI dashboard backend (`/runs`, `/ws`, `/pr-status`).

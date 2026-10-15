@@ -1,8 +1,11 @@
+import logging
 import os
 import time
 import uuid
 
 import asyncpg
+
+logger = logging.getLogger(__name__)
 
 # Optional Postgres persistence (run history + cost telemetry). Table/column
 # names below are quoted to match the DDL in schema.sql exactly (ExecutionMetric,
@@ -35,9 +38,8 @@ async def _get_pool() -> asyncpg.Pool | None:
     global _pool, _warned_no_database
     if not database_configured():
         if not _warned_no_database:
-            print(
-                "[telemetry] DATABASE_URL is not set - run history and cost "
-                "telemetry are disabled (see schema.sql to enable them)."
+            logger.warning(
+                "DATABASE_URL is not set - run history and cost telemetry are disabled (see schema.sql to enable them)"
             )
             _warned_no_database = True
         return None
@@ -162,7 +164,7 @@ async def save_run_event(
                 pr_url,
             )
     except Exception as e:
-        print(f"[runEvent] failed to save run event ({node}/{provider}): {e}")
+        logger.warning("Failed to save run event (%s/%s): %s", node, provider, e)
 
 
 async def record_metric(
@@ -208,7 +210,7 @@ async def record_metric(
                 error_message,
             )
     except Exception as e:
-        print(f"[telemetry] failed to record metric ({node}/{provider}): {e}")
+        logger.warning("Failed to record metric (%s/%s): %s", node, provider, e)
 
 
 class Timer:

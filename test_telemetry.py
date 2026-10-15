@@ -107,11 +107,12 @@ async def test_writes_are_skipped_without_database(no_database):
     )
 
 
-async def test_missing_database_is_reported_once_not_per_event(no_database, capsys):
+async def test_missing_database_is_reported_once_not_per_event(no_database, caplog: pytest.LogCaptureFixture):
     for _ in range(3):
         await telemetry.save_run_event(run_id="r", repo="backend", node="writer", provider="claude", status="success")
-    out = capsys.readouterr().out
-    assert out.count("DATABASE_URL is not set") == 1
+    warnings = [r for r in caplog.records if "DATABASE_URL is not set" in r.getMessage()]
+    assert len(warnings) == 1
+    assert warnings[0].levelname == "WARNING"
 
 
 async def test_unreachable_database_still_raises_on_read(monkeypatch):
@@ -128,7 +129,7 @@ async def test_unreachable_database_still_raises_on_read(monkeypatch):
         await telemetry.fetch_run_events()
 
 
-async def test_unreachable_database_never_breaks_a_write(monkeypatch, capsys):
+async def test_unreachable_database_never_breaks_a_write(monkeypatch, caplog: pytest.LogCaptureFixture):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pw@127.0.0.1:1/db")
     monkeypatch.setattr(telemetry, "_pool", None)
 
@@ -138,7 +139,7 @@ async def test_unreachable_database_never_breaks_a_write(monkeypatch, capsys):
     monkeypatch.setattr(telemetry.asyncpg, "create_pool", refuse)
 
     await telemetry.save_run_event(run_id="r", repo="backend", node="writer", provider="claude", status="success")
-    assert "failed to save run event" in capsys.readouterr().out
+    assert "Failed to save run event" in caplog.text
 
 
 # --- schema.sql must stay in sync with the SQL this module actually runs ------

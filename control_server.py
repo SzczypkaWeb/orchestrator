@@ -2,7 +2,12 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
+from logging_setup import configure_logging
+
+configure_logging()
+
 import asyncio
+import logging
 import os
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -14,6 +19,8 @@ from github import fetch_pr_status
 from lead import run_lead, run_single
 from repos import REPOS
 from telemetry import fetch_run_events, fetch_run_metrics
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -51,8 +58,11 @@ def handle_run_result(task: asyncio.Task[None]) -> None:
         return
     error = task.exception()
 
+    # A failure inside a graph run was already logged with its traceback and
+    # run id (lead.invoke_run); this catches what happens outside one, e.g.
+    # the lead failing to split the task.
     if error is not None:
-        print(f"Run Failed: {error}")
+        logger.error("Background run task failed", exc_info=error)
 
 
 @app.get("/ping")

@@ -1,5 +1,8 @@
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
+
+logger = logging.getLogger(__name__)
 
 TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 529}
 
@@ -22,7 +25,7 @@ async def with_retry[T](fn: Callable[[], Awaitable[T]], max_attempts: int = 3, b
             if attempt == max_attempts:
                 raise RuntimeError(f"Failed after {max_attempts} attempts (last error: {e})") from e
             delay = base_delay * (2 ** (attempt - 1))
-            print(f"Transient error (attempt {attempt}/{max_attempts}): {e}. Retrying in {delay:.0f}s...")
+            logger.warning("Transient error (attempt %d/%d): %s. Retrying in %.0fs", attempt, max_attempts, e, delay)
             await asyncio.sleep(delay)
 
     raise AssertionError("unreachable: the loop always returns or raises")

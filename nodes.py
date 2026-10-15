@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import subprocess
 from typing import Literal
 
@@ -11,6 +12,8 @@ from retry import TRANSIENT_STATUS_CODES, TransientError, with_retry
 from schemas import CLASSIFY_SCHEMA, REVIEW_SCHEMA, WRITER_SCHEMA, Classification, Review, WriterResult
 from state import GraphState
 from telemetry import Timer, record_metric
+
+logger = logging.getLogger(__name__)
 
 # Reviewer is deliberately a different model family than the writer (Claude) -
 # a second Claude call reviewing Claude's own output shares the same blind
@@ -71,7 +74,7 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
             )
             break
         except Exception as e:
-            print(f"[classify_task] {provider_name} failed ({e}), trying next provider...")
+            logger.warning("classify_task: %s failed (%s), trying the next provider", provider_name, e)
             await record_metric(
                 run_id=state["run_id"],
                 repo=state["repo"],
@@ -113,7 +116,7 @@ Respond with JSON matching this schema: {CLASSIFY_SCHEMA}
                             # the whole run: leaving complexity as None falls through to the
                             # stronger writer model below - same "when in doubt, novel" rule
                             # the prompt itself states.
-                            print(f"[classify_task] claude returned an invalid classification ({e}), defaulting to novel")
+                            logger.warning("classify_task: claude returned an invalid classification, defaulting to novel: %s", e)
                     await record_metric(
                         run_id=state["run_id"],
                         repo=state["repo"],
@@ -642,7 +645,7 @@ async def run_security_review(state: GraphState) -> GraphState:
     try:
         review = await _review_with_gemini(state)
     except Exception as e:
-        print(f"[run_security_review] Gemini review failed ({e}), falling back to Claude...")
+        logger.warning("security_review: Gemini failed (%s), falling back to Claude", e)
         review = await _review_with_claude(state)
 
     review_attempts = state.get("review_attempts", 0) + (1 if review.verdict == "changes_requested" else 0)

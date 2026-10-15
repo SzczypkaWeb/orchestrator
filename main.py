@@ -5,8 +5,11 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-from graph import compiled
-from lead import run_lead
+from logging_setup import configure_logging
+
+configure_logging()
+
+from lead import invoke_run, run_lead
 from repos import REPOS, detect_repo_from_cwd, initial_state_for
 
 
@@ -54,9 +57,11 @@ async def main():
         await run_lead(task_text)
         return
 
-    result = await compiled.ainvoke(
+    result = await invoke_run(
         initial_state_for(args.repo, task_text, existing_branch=args.branch or "", existing_pr_url=args.pr_url or "")
     )
+    # The summary below is the CLI's actual output, so it stays print() on
+    # stdout; diagnostics go through logging to stderr and never mix with it.
     print("Model chosen by classifier:", result["writer_model"])
     print("Branch:", result["branch"])
     print("PR:", result["pr_url"])

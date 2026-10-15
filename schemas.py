@@ -1,11 +1,12 @@
-# Structured-output contracts for every LLM call. Each one is moving from a
-# hand-written JSON schema dict to a Pydantic model: the model is the single
-# source of truth for the type (pyright), the runtime validation of what the
-# LLM actually returned, and the JSON schema handed to the provider.
+# Structured-output contracts for every LLM call, as Pydantic models: each
+# model is the single source of truth for the type (pyright), the runtime
+# validation of what the LLM actually returned, and the JSON schema handed to
+# the provider.
 import re
-from typing import Literal
+from collections.abc import Collection
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Classification(BaseModel):
@@ -59,3 +60,41 @@ class Review(BaseModel):
 
 
 REVIEW_SCHEMA = Review.model_json_schema()
+
+
+class Subtask(BaseModel):
+    repo: str
+    task: str
+
+    @field_validator("task")
+    @classmethod
+    def task_is_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("task must not be empty")
+        return value.strip()
+
+
+class LeadPlan(BaseModel):
+    subtasks: list[Subtask]
+
+    @model_validator(mode="after")
+    def one_subtask_per_repo(self) -> "LeadPlan":
+        # Subtasks run in parallel against each repo's single checkout, so two
+        # subtasks for the same repo would have two writers fighting over the
+        # same working tree.
+        repos = [subtask.repo for subtask in self.subtasks]
+        duplicates = sorted({repo for repo in repos if repos.count(repo) > 1})
+        if duplicates:
+            raise ValueError(f"more than one subtask for repo(s): {', '.join(duplicates)}")
+        return self
+
+
+def lead_schema(repo_names: Collection[str]) -> dict[str, Any]:
+    """LeadPlan's JSON schema with `repo` restricted to the given names.
+
+    The allowed repos come from the YAML registry at runtime, so they can't be
+    a Literal on the model; the enum is added to the generated schema instead,
+    and split_task re-checks the answer against the same names."""
+    schema = LeadPlan.model_json_schema()
+    schema["$defs"]["Subtask"]["properties"]["repo"]["enum"] = sorted(repo_names)
+    return schema

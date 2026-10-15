@@ -1,32 +1,18 @@
 import asyncio
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+from pydantic import ValidationError
 
 from events import broadcast
 from graph import compiled
 from repos import REPOS, initial_state_for
 from retry import TRANSIENT_STATUS_CODES, TransientError, with_retry
+from schemas import LeadPlan, Subtask, lead_schema
 
-LEAD_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "subtasks": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "repo": {"type": "string", "enum": list(REPOS.keys())},
-                    "task": {"type": "string"},
-                },
-                "required": ["repo", "task"],
-            },
-        },
-    },
-    "required": ["subtasks"],
-}
+LEAD_SCHEMA = lead_schema(REPOS.keys())
 
 
-async def split_task(high_level_task: str) -> list[dict]:
+async def split_task(high_level_task: str) -> list[Subtask]:
     prompt = f"""
 You are a technical lead splitting a cross-cutting engineering request into
 repo-scoped subtasks.
@@ -41,8 +27,8 @@ self-contained task description an engineer working ONLY in that repo could
 follow without seeing the other repos. If a repo needs no change, omit it.
 """
 
-    async def attempt():
-        subtasks = []
+    async def attempt() -> list[Subtask]:
+        subtasks: list[Subtask] = []
         async for message in query(
             prompt=prompt,
             options=ClaudeAgentOptions(
@@ -57,7 +43,16 @@ follow without seeing the other repos. If a repo needs no change, omit it.
                         raise TransientError(f"{message.api_error_status}: {message.result}")
                     raise RuntimeError(f"Lead splitting failed ({message.api_error_status}): {message.result}")
                 if message.subtype == "success" and message.structured_output:
-                    subtasks = message.structured_output["subtasks"]
+                    # Retrying is safe here, unlike in the writer: the lead runs
+                    # with no tools, so a bad plan has had no side effects yet.
+                    try:
+                        plan = LeadPlan.model_validate(message.structured_output)
+                    except ValidationError as e:
+                        raise TransientError(f"Lead returned an invalid plan: {e}") from e
+                    unknown = sorted({subtask.repo for subtask in plan.subtasks} - REPOS.keys())
+                    if unknown:
+                        raise TransientError(f"Lead planned work for unknown repo(s): {', '.join(unknown)}")
+                    subtasks = plan.subtasks
                 elif message.subtype == "success":
                     raise TransientError("Lead completed without calling structured output")
                 else:
@@ -75,7 +70,7 @@ async def run_lead(high_level_task: str) -> None:
 
     print("Subtask breakdown:")
     for st in subtasks:
-        print(f"  - {st['repo']}: {st['task']}")
+        print(f"  - {st.repo}: {st.task}")
 
     # Build each subtask's state once (not inline in the gather() call below)
     # so we can broadcast its "trigger" event - carrying the task text, since
@@ -84,7 +79,7 @@ async def run_lead(high_level_task: str) -> None:
     # node (classify_task) finishes several seconds later.
     states = []
     for st in subtasks:
-        state = initial_state_for(st["repo"], st["task"])
+        state = initial_state_for(st.repo, st.task)
         await broadcast(
             {
                 "run_id": state["run_id"],
@@ -92,7 +87,7 @@ async def run_lead(high_level_task: str) -> None:
                 "node": "trigger",
                 "provider": "user",
                 "status": "success",
-                "detail": st["task"],
+                "detail": st.task,
             }
         )
         states.append(state)
@@ -104,7 +99,7 @@ async def run_lead(high_level_task: str) -> None:
 
     print("\n=== Results ===")
     for st, result in zip(subtasks, results):
-        print(f"\n[{st['repo']}]")
+        print(f"\n[{st.repo}]")
         if isinstance(result, BaseException):
             print(f"  ERROR: {result}")
         else:

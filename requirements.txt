@@ -30,7 +30,7 @@ ormsgpack==1.12.2
 packaging==26.3
 pycparser==3.11
 pydantic==2.14.1
-pydantic-settings==2.15.0
+pydantic-settings==2.16.0
 pydantic_core==2.50.1
 PyJWT==2.15.1
 python-dotenv==1.2.4
